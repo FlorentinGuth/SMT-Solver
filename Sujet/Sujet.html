@@ -1,0 +1,99 @@
+<html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<link rel="stylesheet" type="text/css" href="Sujet_files/style.css">
+<title>
+Programming Project - SMT Solver
+</title>
+<style>
+tt {
+        color:blue;
+}
+pre {
+        color:blue;
+}
+</style>
+</head>
+
+<body>
+
+<div align="center"><b><font size="15">Projet de programmation</font></b><p><b><font size="15">Mini
+	Solver SMT</font></b></p></div>
+
+<p>
+Le projet est à rendre pour le <b><font color="red">??? 2017</font></b>. Il peut être réalisé en <b>binôme</b>.
+
+</p><h2>Programmer votre solver SMT</h2>
+
+Le but du projet est de programmer un démonstrateur SMT combinant un
+solver SAT avec une procédure de décision pour la théorie de l'égalité
+(uniquement entre variables). Essentiellement, cela revient à
+s'inspirer des règles de DPLL(T) vues en cours, et à utiliser une
+structure union-find comme procédure de décision pour la théorie de
+l'égalité (cette structure devra être étendue pour raisonner sur les
+différences).
+
+<h3>Langage d'entrée</h3>
+
+Le langage d'entrée de votre solver SMT est une simple extension du
+format Dimacs des solvers SAT. Voici sa syntaxe sur un petit exemple:
+
+<pre>c Exemple d'un fichier .cnfuf 
+p cnf 4 2
+1=2 2&lt;&gt;4 1=3
+1=3 4&lt;&gt;1
+</pre>
+
+La première ligne qui commence par le caractère <tt>c</tt> est un
+commentaire. La deuxième ligne <tt>p cnf 4 2</tt> indique que la
+formule est une CNF avec 4 variables et 2 clauses. Les variables sont
+représentées par des entiers (dans
+l'exemple, <tt>1</tt>, <tt>2</tt>, <tt>3</tt> et <tt>4</tt>). Chaque
+clause tient sur une seule ligne et est constituée d'atomes de la
+forme <tt>i=j</tt> ou <tt>i&lt;&gt;j</tt>, où <tt>i</tt> et <tt>j</tt>
+représentent deux variables, c'est-à-dire deux entiers
+entre <tt>1</tt> et <tt>4</tt>.
+
+<h3>Les transparents du cours</h3>
+
+<ul>
+<li>Cours 8 : <a href="https://www.lri.fr/%7Econchon/ENS/cours8.pdf">Model Checking Modulo Theories</a></li>
+<li>Cours 9 : <a href="https://www.lri.fr/%7Econchon/ENS/cours9.pdf">Satisfiability Modulo Theories</a></li>
+</ul>
+
+<h3>TP sur Cubicle</h3>
+
+<ul>
+  <li>Le <a href="https://www.lri.fr/%7Econchon/ENS/TP/tp_cubicle.pdf">protocole MSI</a> en cubicle</li>
+</ul>
+
+<h3>Quelques articles</h3>
+
+<li>
+Une <a href="https://www.lri.fr/%7Efilliatr/ftp/publis/puf-wml07.pdf">structure
+    Union-Find persistante</a> en OCaml
+</li>
+<li>
+Détails
+d'<a href="http://www.princeton.edu/%7Echaff/publication/DAC2001v56.pdf">implémentation
+    de zchaff</a> (en particulier, two-watched literals)
+</li>
+<li>
+Heuristique pour déterminer la qualité
+des <a href="http://www.ijcai.org/papers09/Papers/IJCAI09-074.pdf">clauses apprises</a>
+</li>
+
+<h3>À rendre pour le ??? 2017</h3>
+
+<p>
+Envoyez votre solution sous la forme d'un fichier compressé portant
+      votre nom (<tt>nom.tgz</tt>), ou les deux noms de votre binôme
+      (<tt>nom1-nom2.tgz</tt>), à
+<tt>sylvain.conchon@lri.fr</tt>
+
+</p><p> Votre archive devra contenir les sources de votre programme, un
+  makefile pour le compiler, un petit texte d'une page décrivant ce
+  que vous avez implémenté et les fichiers de tests que vous avez utilisés.
+
+
+
+</p></body></html>
