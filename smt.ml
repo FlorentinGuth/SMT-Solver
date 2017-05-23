@@ -42,8 +42,8 @@ let cnf_to_sat cnf =
 
 
 let neg_rel = function
-  | MC.Eq -> MC.Neq
-  | MC.Neq -> MC.Eq
+  | MC. Eq -> MC.Neq
+  | MC.Neq -> MC. Eq
 
 let neg_atom (a : atom) =
   let (rel, v1, v2) = a in
