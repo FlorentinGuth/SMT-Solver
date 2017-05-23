@@ -1,4 +1,4 @@
-FLAGS = -I _build/ -use-menhir
+FLAGS = -I _build/ -use-menhir -yaccflag --explain
 
 all: main.byte
 

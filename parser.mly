@@ -1,5 +1,5 @@
 %{
-  open Ast
+  open Smt
 %}
 
 
@@ -10,7 +10,7 @@
 %token EOF
 
 
-%start <Ast.cnf> file
+%start <Smt.cnf> file
 
 
 %%
@@ -22,8 +22,8 @@ var:
 | v = INT; { if v = 0 then failwith "Incorrect variable 0" else v - 1 }
 
 atom:
-| i = var;  EQ; j = var; {  Eq, i, j }
-| i = var; NEQ; j = var; { Neq, i, j }
+| i = var;  EQ; j = var; { MC. Eq, i, j }
+| i = var; NEQ; j = var; { MC.Neq, i, j }
 
 clause:
 | cl = nonempty_list(atom); { cl }
@@ -32,9 +32,11 @@ formula:
 | f = separated_nonempty_list(newline, clause); { f }
 
 file:
-| P; CNF; nb_var = INT; nb_cl = INT; newline;
+| list(NEWLINE);
+  P; CNF; nb_var = INT; nb_cl = INT;
+  nonempty_list(newline);
   f = formula;
-  list(NEWLINE); EOF;
+  list(newline); EOF;
   {
     if List.length f <> nb_cl
     then failwith "Incorrect number of clauses"
