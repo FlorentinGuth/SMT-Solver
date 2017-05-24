@@ -1,3 +1,6 @@
+open Format
+open Printer
+
 module UF = Persistent_union_find
 
 
@@ -12,11 +15,22 @@ type model = {
 }
 
 
+let print_rel fmt rel =
+  fprintf fmt "%s" (match rel with Eq -> "=" | Neq -> "!=")
+let print_atom fmt (rel,v1,v2) =
+  fprintf fmt "%d%a%d" v1 print_rel rel v2
+let print_formula fmt f =
+  print_list print_atom "/\\" fmt f
+let print_model fmt m =
+  print_formula fmt m.f
+
+
 (** We check a model the following way:
     - first, we use a union find structure in which every variable is alone,
     - then, we consider all equalities and merge the adequate classes,
     - last, if there is an inequality between two variables of the same class,
       then the model is not satisfiable, otherwise it is *)
+
 let rec check_aux t f neqs =
   match f with
   | [] ->

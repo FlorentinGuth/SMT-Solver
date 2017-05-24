@@ -12,5 +12,13 @@ type cnf = {
 type model = bool array     (** An assignment of all variables *)
 
 
+val print_var     : Format.formatter -> var     -> unit
+val print_clause  : Format.formatter -> clause  -> unit
+val print_formula : Format.formatter -> formula -> unit
+val print_cnf     : Format.formatter -> cnf     -> unit
+
+val print_model   : Format.formatter -> model   -> unit
+
+
 (** This function solves the given CNF, returning a model if satisfiable or None otherwise *)
 val solve : cnf -> model option

@@ -11,5 +11,11 @@ type model = {
 }
 
 
+val print_rel     : Format.formatter -> rel     -> unit
+val print_atom    : Format.formatter -> atom    -> unit
+val print_formula : Format.formatter -> formula -> unit
+val print_model   : Format.formatter -> model   -> unit
+
+
 (** Returns true if the model is satisfiable, otherwise false *)
 val check : model -> bool

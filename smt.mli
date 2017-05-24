@@ -17,5 +17,12 @@ type cnf = {
 }
 
 
+val print_rel     : Format.formatter -> rel     -> unit
+val print_atom    : Format.formatter -> atom    -> unit
+val print_clause  : Format.formatter -> clause  -> unit
+val print_formula : Format.formatter -> formula -> unit
+val print_cnf     : Format.formatter -> cnf     -> unit
+
+
 (** Returns true if the CNF formula is satisfiable, otherwise false *)
 val satisfiable : cnf -> bool
