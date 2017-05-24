@@ -1,5 +1,10 @@
 %{
   open Smt
+
+  let rec filter_some = function
+    | [] -> []
+    | None :: tl -> filter_some tl
+    | Some x :: tl -> x :: filter_some tl
 %}
 
 
@@ -29,14 +34,14 @@ clause:
 | cl = nonempty_list(atom); { cl }
 
 formula:
-| f = separated_nonempty_list(newline, clause); { f }
+| f = separated_nonempty_list(NEWLINE, option(clause));  (* We use options to read all newlines *)
+  { filter_some f }
 
 file:
 | option(newline);
   P; CNF; nb_var = INT; nb_cl = INT;
-  newline;
   f = formula;
-  option(newline); EOF;
+  EOF;
   {
     if List.length f <> nb_cl
     then failwith "Incorrect number of clauses"
