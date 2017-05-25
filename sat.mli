@@ -1,7 +1,9 @@
 (** The types of the CNF formula used by the SAT solver *)
 
 type var     = int          (** A boolean variable *)
-type clause  = var    list  (** Represents a disjunction *)
+type neg     = Neg | NoNeg  (** Whether the variable is negated *)
+type atom    = neg * var
+type clause  = atom   list  (** Represents a disjunction *)
 type formula = clause list  (** Represents a conjunction *)
 type cnf = {
   nb_var : int;             (** Variables in the formula range from 0 to nb_vars - 1 *)
@@ -13,6 +15,8 @@ type model = bool array     (** An assignment of all variables *)
 
 
 val print_var     : Format.formatter -> var     -> unit
+val print_neg     : Format.formatter -> neg     -> unit
+val print_atom    : Format.formatter -> atom    -> unit
 val print_clause  : Format.formatter -> clause  -> unit
 val print_formula : Format.formatter -> formula -> unit
 val print_cnf     : Format.formatter -> cnf     -> unit

@@ -1,14 +1,13 @@
 open Format
 open Printer
 
-
 module SAT = Sat
 module MC  = Mc
 
 
-type var = int
-type rel = MC.rel
-type atom = rel * var * var
+type var     = int
+type rel     = MC.rel
+type atom    = rel * var * var
 type clause  = atom   list  (* Represents a disjunction *)
 type formula = clause list  (* Represents a conjunction *)
 
@@ -34,31 +33,123 @@ let print_cnf fmt cnf =
   print_formula fmt cnf.f
 
 
-type conv_list  = (atom * SAT.var) list  (** Maps atoms to a SAT variable, which must range from 0 to ... *)
-type conv_array = atom array             (** SAT variables are indexes *)
-let conv_list_to_array (l : conv_list) nb_var =
-  let a = Array.make nb_var (MC.Eq, 0, 0) in
-  List.iter (fun (atom, v) -> a.(v) <- atom) l;
-  (a : conv_array)
+(** Conversion to SAT formula:
+    - Each SAT variable corresponds to an equality between a pair of variables
+    - An inequality is then the negation of a variable
+    - We detect that i=j is the same as j=i,
+    - We replace i=i by true and i!=i by false,
+*)
 
+(** The type of the structure memorizing the conversion from SMT atoms to SAT atoms:
+    conv.(max i j).(min i j) is the SAT variable associated to i=j *)
+type smt_sat_conv = {
+  array: SAT.var option array array;
+  mutable free_var: SAT.var;         (* The variables from 0 to free_var - 1 are used *)
+}
 
-let rec clause_to_sat (cl : clause) (var : SAT.var) (acc : SAT.clause) (table : conv_list) =
-  match cl with
-  | [] -> (var, acc, table)
-  | a :: tl -> clause_to_sat tl (var + 1) (var :: acc) ((a, var) :: table)
+let create_conv nb_var =
+  { array = Array.init nb_var (fun i -> Array.make i None); free_var = 0 }
 
-let rec formula_to_sat (f : formula) (var : SAT.var) (acc : SAT.formula) (table : conv_list) =
-  match f with
-  | [] -> (var, acc, conv_list_to_array table var)
-  | cl :: tl -> let (var, cl_sat, table) = clause_to_sat cl var [] table in
-    formula_to_sat tl var (cl_sat :: acc) table
+type sat_atom =
+  | ATrue
+  | AFalse
+  | Atom of SAT.atom
+let atom_to_sat conv ((rel, v1, v2) : atom) =
+  if v1 = v2 then
+    match rel with
+    | MC.Eq -> ATrue
+    | MC.Neq -> AFalse
+  else
+    let (vmin, vmax) = (min v1 v2, max v1 v2) in
+    let sat_var = match conv.array.(vmax).(vmin) with
+      | Some v -> v
+      | None -> let v = conv.free_var in
+        conv.free_var <- v + 1;
+        conv.array.(vmax).(vmin) <- Some v;
+        v
+    in
+    Atom ((match rel with MC.Eq -> SAT.NoNeg | MC.Neq -> SAT.Neg), sat_var)
 
+type sat_clause =
+  | CTrue
+  | CFalse
+  | Clause of SAT.clause
+let clause_to_sat conv (cl : clause) =
+  let rec aux cl acc =
+    match cl with
+    | [] ->
+      if acc = [] then
+        CFalse (* Only false atoms or empty clause *)
+      else
+        Clause acc
 
-(** Converts a formula to a boolean CNF for the SAT solver *)
+    | a :: tl -> begin
+        match atom_to_sat conv a with
+        | ATrue  -> CTrue             (* The clause will be always true *)
+        | AFalse -> aux tl acc        (* We ignore the atom *)
+        | Atom a -> aux tl (a :: acc)
+      end
+  in
+  aux cl []
+
+type sat_formula =
+  | FTrue
+  | FFalse
+  | Formula of SAT.formula
+let formula_to_sat conv (f : formula) =
+  let rec aux f acc =
+    match f with
+    | [] ->
+      if acc = [] then
+        FTrue
+      else
+        Formula acc
+
+    | cl :: tl -> begin
+        match clause_to_sat conv cl with
+        | CTrue -> aux tl acc  (* Ignore the always-true clause *)
+        | CFalse -> FFalse
+        | Clause cl -> aux tl (cl :: acc)
+      end
+  in
+  aux f []
+
 let cnf_to_sat cnf =
-  let (nb_var, f, conv) = formula_to_sat cnf.f 0 [] [] in
-  (SAT.{ nb_var; nb_cl = cnf.nb_cl; f }, conv)
+  let conv = create_conv cnf.nb_var in
+  match formula_to_sat conv cnf.f with
+  | Formula f -> (SAT.{ nb_var = conv.free_var; nb_cl = List.length f; f }, conv)
+  (* TODO: Deal with the particular cases without calling the SAT solver, we can answer right away *)
+  | FTrue ->  (SAT.{ nb_var = 0; nb_cl = 0; f = [  ] }, create_conv cnf.nb_var)
+  | FFalse -> (SAT.{ nb_var = 0; nb_cl = 1; f = [[]] }, create_conv cnf.nb_var)
 
+
+
+(** Converts a SAT model to an equality model for the Model Checker *)
+let model_to_mc (m : SAT.model) conv =
+  (* First, invert the conv array: maps a SAT var to a pair (i,j) (atom i=j) *)
+  let nb_var = conv.free_var in
+  let inv_array = Array.make nb_var (0, 0) in
+  for i = 0 to Array.length conv.array - 1 do
+    for j = 0 to i - 1 do
+      match conv.array.(i).(j) with
+      | None -> ()
+      | Some v -> inv_array.(v) <- (i, j)
+    done;
+  done;
+
+  let f = ref ([] : MC.formula) in
+  for v = 0 to nb_var - 1 do
+    let a = match (m.(v), inv_array.(v)) with
+      | (true,  (i, j)) -> (MC.Eq,  i, j)
+      | (false, (i, j)) -> (MC.Neq, i, j)
+    in
+    f := a :: !f;
+  done;
+  MC.{ nb_var; f = !f }
+
+
+
+(** Add the negation of the model to the formula *)
 
 let neg_rel = function
   | MC. Eq -> MC.Neq
@@ -68,18 +159,6 @@ let neg_atom (a : atom) =
   let (rel, v1, v2) = a in
   ((neg_rel rel, v1, v2) : atom)
 
-(** Converts a SAT model to an equality model for the Model Checker *)
-let model_to_mc (m : SAT.model) (conv : conv_array) =
-  let nb_var = Array.length m in
-  let f = ref ([] : MC.formula) in
-  for i = 0 to nb_var - 1 do
-    let a = if m.(i) then conv.(i) else neg_atom conv.(i) in
-    f := a :: !f;
-  done;
-  MC.{ nb_var; f = !f }
-
-
-(** Add the negation of the model to the formula *)
 let add_model_neg cnf (m : MC.model) =
   { nb_var = cnf.nb_var;
     nb_cl = cnf.nb_cl + 1;

@@ -1,3 +1,6 @@
+c This formula states that each variable must be equal to another
+c A solution is 1=4 <> 2=5 <> 3
+
 p cnf 5 8
 5=1 5=2 5=3 5=4
 1=5 1=2 1=3 1=4

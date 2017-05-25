@@ -3,7 +3,9 @@ open Printer
 
 
 type var     = int          (** A boolean variable *)
-type clause  = var    list  (** Represents a disjunction *)
+type neg     = Neg | NoNeg  (** Whether the variable is negated *)
+type atom    = neg * var
+type clause  = atom   list  (** Represents a disjunction *)
 type formula = clause list  (** Represents a conjunction *)
 type cnf = {
   nb_var : int;             (** Variables in the formula range from 0 to nb_vars - 1 *)
@@ -16,8 +18,12 @@ type model = bool array     (** An assignment of all variables *)
 
 let print_var fmt var =
   fprintf fmt "%d" var
+let print_neg fmt neg =
+  fprintf fmt "%s" (match neg with Neg -> "!" | NoNeg -> "")
+let print_atom fmt (n,v) =
+  fprintf fmt "%a%a" print_neg n print_var v
 let print_clause fmt clause =
-  print_list print_var "\\/" fmt clause
+  print_list print_atom "\\/" fmt clause
 let print_formula fmt f =
   print_list print_clause " /\\ " fmt f
 let print_cnf fmt cnf =
@@ -38,7 +44,14 @@ let rec generate_models n =
 
 (** Test an assignment on the CNF *)
 let test_model cnf (m : model) =
-  List.fold_left (fun b cl -> b && (List.fold_left (fun b v -> b || m.(v)) false cl)) true cnf.f
+  List.fold_left
+    (fun b cl ->
+       b &&
+       (List.fold_left
+          (fun b (n,v) ->
+             b || (match n with Neg -> not m.(v) | NoNeg -> m.(v)))
+          false cl))
+    true cnf.f
 
 (** Try all models *)
 let rec try_all cnf = function
