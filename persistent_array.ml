@@ -1,8 +1,12 @@
+
+(* TODO Defunctorize ? *)
+
 (** An array is either an immediate array, or a persistent array with a modification *)
 type 'a t = 'a data ref
 and 'a data =
   | Arr  of 'a array
   | Diff of int * 'a * 'a t
+  | Invalid
 
 
 let init n f =
@@ -30,11 +34,12 @@ let rec reroot' t k =
   | Arr a -> k a
   | Diff (i, x, t') ->
     reroot' t' (fun a ->
-                 let x' = a.(i) in
                  a.(i) <- x;
                  t := Arr a;
-                 t' := Diff (i, x', t);
+                 t' := Invalid;
                  a)
+  | Invalid -> assert false
+
 let reroot t =
   reroot' t (fun a -> a)
 
@@ -42,11 +47,13 @@ let rec get t i =
   match !t with
   | Arr a -> a.(i)
   | Diff _ -> let a = reroot t in a.(i)
+  | Invalid -> assert false
 
 let set t i x =
   let a = reroot t in
   let x' = a.(i) in
-  let t' = ref (Arr a) in
-  a.(i) <- x;
-  t := Diff (i, x', t');
-  t'
+  if x' = x then t else
+    let t' = ref (Arr a) in
+    a.(i) <- x;
+    t := Diff (i, x', t');
+    t'
