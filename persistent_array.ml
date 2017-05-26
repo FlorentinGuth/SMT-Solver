@@ -1,4 +1,3 @@
-
 (** An array is either an immediate array, or a persistent array with a modification *)
 type 'a t = 'a data ref
 and 'a data =
@@ -23,6 +22,7 @@ let rec reroot t =
     t  := Arr a;
     t' := Diff (i, x', t);
     a
+  | Invalid -> assert false
 *)
 
 (** Same function, but tail-recursive with continuation-passing style.
@@ -35,7 +35,7 @@ let rec reroot' t k =
                  a.(i) <- x;
                  t := Arr a;
                  t' := Invalid;
-                 a)
+                 k a)
   | Invalid -> assert false
 
 let reroot t =
@@ -64,3 +64,6 @@ let filter f a =
 
 let map f a =
   Array.map f (reroot a)
+
+let to_list a =
+  Array.to_list (reroot a)
