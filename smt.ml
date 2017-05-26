@@ -127,9 +127,10 @@ let cnf_to_sat cnf =
 (** Converts a SAT model to an equality model for the Model Checker *)
 let model_to_mc (m : SAT.model) conv =
   (* First, invert the conv array: maps a SAT var to a pair (i,j) (atom i=j) *)
-  let nb_var = conv.free_var in
-  let inv_array = Array.make nb_var (0, 0) in
-  for i = 0 to Array.length conv.array - 1 do
+  let nb_var_sat = conv.free_var in
+  let nb_var_mc  = Array.length conv.array in
+  let inv_array = Array.make nb_var_sat (0, 0) in
+  for i = 0 to nb_var_mc - 1 do
     for j = 0 to i - 1 do
       match conv.array.(i).(j) with
       | None -> ()
@@ -138,14 +139,14 @@ let model_to_mc (m : SAT.model) conv =
   done;
 
   let f = ref ([] : MC.formula) in
-  for v = 0 to nb_var - 1 do
+  for v = 0 to nb_var_sat - 1 do
     let a = match (m.(v), inv_array.(v)) with
       | (true,  (i, j)) -> (MC.Eq,  i, j)
       | (false, (i, j)) -> (MC.Neq, i, j)
     in
     f := a :: !f;
   done;
-  MC.{ nb_var; f = !f }
+  MC.{ nb_var = nb_var_mc; f = !f }
 
 
 
@@ -166,12 +167,13 @@ let add_model_neg cnf (m : MC.model) =
 
 
 let rec satisfiable cnf =
-  print_stdout "CNF: %a\n" print_cnf cnf;
+  (*print_stdout "CNF: %a\n" print_cnf cnf;*)
   let (sat_cnf, conv) = cnf_to_sat cnf in
   print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf;
   match SAT.solve sat_cnf with
   | None -> print_stdout "Unsatisfiable SAT formula\n"; false
   | Some m -> print_stdout "SAT found model %a\n" SAT.print_model m;
+    assert (SAT.test_model sat_cnf m);
     let m_mc = model_to_mc m conv in
     print_stdout "Calling Model Checker on %a\n" MC.print_model m_mc;
     if MC.check m_mc then begin
@@ -181,3 +183,4 @@ let rec satisfiable cnf =
       print_stdout "Model Checker invalidated the model, adding negation\n";
       satisfiable (add_model_neg cnf m_mc)
     end
+    

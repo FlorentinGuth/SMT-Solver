@@ -23,6 +23,7 @@ val print_cnf     : Format.formatter -> cnf     -> unit
 
 val print_model   : Format.formatter -> model   -> unit
 
+val test_model    : cnf -> model -> bool
 
 (** This function solves the given CNF, returning a model if satisfiable or None otherwise *)
 val solve : cnf -> model option

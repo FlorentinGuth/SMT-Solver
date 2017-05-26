@@ -1,6 +1,4 @@
 
-(* TODO Defunctorize ? *)
-
 (** An array is either an immediate array, or a persistent array with a modification *)
 type 'a t = 'a data ref
 and 'a data =
@@ -57,3 +55,12 @@ let set t i x =
     a.(i) <- x;
     t := Diff (i, x', t');
     t'
+
+let fold_left f a b =
+  Array.fold_left f a (reroot b)
+
+let filter f a =
+  Array.fold_left (fun l x -> if f x then x::l else l) [] (reroot a)
+
+let map f a =
+  Array.map f (reroot a)
