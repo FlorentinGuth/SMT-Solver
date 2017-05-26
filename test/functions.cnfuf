@@ -1,0 +1,5 @@
+c Unsatisfiable, f is the identity function
+p cnf 0 0
+f(f(f(1))) = 1
+f(f(f(f(f(1))))) = 1
+f(1) != 1

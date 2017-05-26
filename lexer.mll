@@ -19,11 +19,14 @@ rule token = parse
         | "p"   -> P
         | "cnf" -> CNF
         | "c"   -> comment lexbuf
-        | _     -> failwith "Unknown identifier"
+        | f     -> FUNC f
       }
   | integer as n { INT (int_of_string n) }
   | "="          { EQ }
-  | "<>"         { NEQ }
+  | "!=" | "<>"  { NEQ }
+  | "("          { LPAR }
+  | ")"          { RPAR }
+  | ","          { COMMA }
   | eof          { EOF }
 
 and comment = parse

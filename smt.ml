@@ -5,31 +5,46 @@ module SAT = Sat
 module MC  = Mc
 
 
-type var     = int
+type var     = MC.var
+type func    = MC.func
+type lit     = MC.lit
+type literal = MC.literal
+
 type rel     = MC.rel
-type atom    = rel * var * var
-type clause  = atom   list  (* Represents a disjunction *)
-type formula = clause list  (* Represents a conjunction *)
+type atom    = MC.clause
+type clause  = atom   list     (* Represents a disjunction *)
+type formula = clause list     (* Represents a conjunction *)
 
 type cnf = {
-  nb_var : int;             (* Variables in the formula range from 0 to nb_vars - 1 *)
-  nb_cl  : int;             (* The number of clauses in the formula *)
-  f      : formula;
+  (* nb_var   : int;              (\* Variables in the formula range from 0 to nb_vars - 1 *\) *)
+  (* nb_func  : int;              (\* Same as above for functions *\) *)
+  nb_lit   : int;              (* Same as above for literals *)
+  (* nb_cl    : int;              (\* The number of clauses in the formula *\) *)
+  f        : formula;
+  literals : literal array;    (* Maps a literal ident to the literal *)
 }
 
 
-let print_rel fmt rel =
-  fprintf fmt "%s" (match rel with
-                     | MC.Eq -> "="
-                     | MC.Neq -> "!=")
-let print_atom fmt atom =
-  let (rel, v1, v2) = atom in
-  fprintf fmt "%d%a%d" v1 print_rel rel v2
-let print_clause fmt clause =
-  print_list print_atom "\\/" fmt clause
-let print_formula fmt f =
-  print_list print_clause " /\\ " fmt f
 let print_cnf fmt cnf =
+  let rec print_lit fmt lit =
+    match cnf.literals.(lit) with
+    | MC.Var v -> fprintf fmt "%d" v
+    | MC.Func (f, l) -> fprintf fmt "%s(%a)" f print_lit_list l
+  and print_lit_list fmt l =
+    print_list print_lit "," fmt l
+  in
+  let print_rel fmt rel =
+    fprintf fmt "%s" (match rel with MC.Eq -> eq_str | MC.Neq -> neq_str)
+  in
+  let print_atom fmt (rel,l1,l2) =
+    fprintf fmt "%a%a%a" print_lit l1 print_rel rel print_lit l2
+  in
+  let print_clause fmt cl =
+    print_list print_atom or_str fmt cl
+  in
+  let print_formula fmt f =
+    print_list print_clause and_str fmt f
+  in
   print_formula fmt cnf.f
 
 
@@ -115,17 +130,17 @@ let formula_to_sat conv (f : formula) =
   aux f []
 
 let cnf_to_sat cnf =
-  let conv = create_conv cnf.nb_var in
+  let conv = create_conv cnf.nb_lit in
   match formula_to_sat conv cnf.f with
   | Formula f -> (SAT.{ nb_var = conv.free_var; nb_cl = List.length f; f }, conv)
   (* TODO: Deal with the particular cases without calling the SAT solver, we can answer right away *)
-  | FTrue ->  (SAT.{ nb_var = 0; nb_cl = 0; f = [  ] }, create_conv cnf.nb_var)
-  | FFalse -> (SAT.{ nb_var = 0; nb_cl = 1; f = [[]] }, create_conv cnf.nb_var)
+  | FTrue ->  (SAT.{ nb_var = 0; nb_cl = 0; f = [  ] }, create_conv cnf.nb_lit)
+  | FFalse -> (SAT.{ nb_var = 0; nb_cl = 1; f = [[]] }, create_conv cnf.nb_lit)
 
 
 
 (** Converts a SAT model to an equality model for the Model Checker *)
-let model_to_mc (m : SAT.model) conv =
+let model_to_mc (m : SAT.model) conv literals =
   (* First, invert the conv array: maps a SAT var to a pair (i,j) (atom i=j) *)
   let nb_var_sat = conv.free_var in
   let nb_var_mc  = Array.length conv.array in
@@ -146,7 +161,7 @@ let model_to_mc (m : SAT.model) conv =
     in
     f := a :: !f;
   done;
-  MC.{ nb_var = nb_var_mc; f = !f }
+  MC.{ nb_lit = nb_var_mc; f = !f; literals; }
 
 
 
@@ -161,9 +176,7 @@ let neg_atom (a : atom) =
   ((neg_rel rel, v1, v2) : atom)
 
 let add_model_neg cnf (m : MC.model) =
-  { nb_var = cnf.nb_var;
-    nb_cl = cnf.nb_cl + 1;
-    f = (List.map neg_atom m.MC.f) :: cnf.f; }
+    { cnf with f = (List.map neg_atom m.MC.f) :: cnf.f; }
 
 
 let rec satisfiable cnf =
@@ -174,7 +187,7 @@ let rec satisfiable cnf =
   | None -> print_stdout "Unsatisfiable SAT formula\n"; false
   | Some m -> print_stdout "SAT found model %a\n" SAT.print_model m;
     assert (SAT.test_model sat_cnf m);
-    let m_mc = model_to_mc m conv in
+    let m_mc = model_to_mc m conv cnf.literals in
     print_stdout "Calling Model Checker on %a\n" MC.print_model m_mc;
     if MC.check m_mc then begin
       print_stdout "Model Checker validated the model\n";
@@ -183,4 +196,3 @@ let rec satisfiable cnf =
       print_stdout "Model Checker invalidated the model, adding negation\n";
       satisfiable (add_model_neg cnf m_mc)
     end
-    

@@ -3,7 +3,7 @@ module PArray = Persistent_array
 
 type t = {
   mutable parent : int PArray.t;
-  rank           : int PArray.t
+  rank           : int PArray.t;
 }
 
 
@@ -47,4 +47,3 @@ let union t i j =
       { parent = PArray.set t.parent pj pi; rank = PArray.set t.rank pi (ri + 1) }
   else
     t
-

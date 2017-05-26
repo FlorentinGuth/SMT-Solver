@@ -12,3 +12,9 @@ let print_list printer sep =
     | x :: xs -> fprintf fmt "%a%s%a" printer x sep list_printer xs
   in
   list_printer
+
+
+let eq_str  =  "="
+let neq_str = "!="
+let or_str  = "\\/"
+let and_str = "/\\"

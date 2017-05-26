@@ -19,3 +19,5 @@ val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
 val filter : ('a -> bool) -> 'a t -> 'a list
 (** Same as Array.map for persistent array, with real arrays in return*)
 val map : ('a -> 'b) -> 'a t -> 'b array
+(** Same as Array.to_list for persistent array*)
+val to_list : 'a t -> 'a list
