@@ -6,9 +6,6 @@ type var     = int          (** A boolean variable *)
 type neg     = Neg | NoNeg  (** Whether the variable is negated *)
 type atom    = neg * var
 type clause  = atom list    (** Represents a disjunction *)
-type formula_sat = (bool * clause) list
-(** Represents a conjunction.
- *  The bool stands for wether the clause is satisfied or not *)
 type formula = clause list
 
 type cnf = {
@@ -54,10 +51,6 @@ let print_guess_model fmt m =
                -> fprintf fmt "%d:%s%s" l.var (if not l.defined then "x" else
                                       if l.neg = Neg then "F" else "T")
                    (if l.guessed then "?" else "")) " " fmt (PA.to_list m)
-
-let print_formula_sat fmt (f : formula_sat) =
-  print_list (fun fmt (b,_) -> fprintf fmt "%s" (if b then "Y" else "N")) "-"
-    fmt f
 
 
 (** Dummy solver: we test all possible assignments *)
@@ -131,55 +124,49 @@ let unit (m : guess_model) (c : clause) =
 let decide (m : guess_model) ((n,v) : atom) =
   (PA.set m v {var = v; neg = n; defined = true; guessed = true} : guess_model)
 
-let fail (m : guess_model) (f : formula_sat) =
-  List.fold_left (fun x c -> if x || fst c then x else model_implies_not m
-                       (snd c)) false f
+let fail (m : guess_model) (f : formula) =
+  List.fold_left (fun x c -> if x then x else model_implies_not m c) false f
 
-let success (m : guess_model) (f : formula_sat) =
-  List.fold_left (fun x c -> if x && not (fst c) then model_implies m (snd c)
-                   else x) true f
+let success (m : guess_model) (f : formula) =
+  List.fold_left (fun x c -> if x then model_implies m c else x) true f
 
-let success_fail (m : guess_model) (f : formula_sat) =
+let success_fail (m : guess_model) (f : formula) =
   let prune (f, (stop, valid)) c =
     if stop then (f, (stop, valid)) else
-    if fst c then (c::f, (stop, valid)) else
-      let (fail, unknown) = check_model m (false, false) (snd c) in
+      let (fail, unknown) = check_model m (false, false) c in
       let check = not (fail || unknown) in
-      ( ((check, snd c)::f : formula_sat),
+      ( (if check then f else c::f : formula),
          ((if (not unknown) && fail then true else false), valid && check)) in
   List.fold_left prune ([], (false, true)) f
 
-
-let best_literal (m : guess_model) =
-  let l = PA.filter (fun x -> not x.defined) m in
-  if l = [] then None else
-    let r = Random.int (List.length l) in
-    let x = List.nth l r in
-    Some ((x.neg, x.var) : atom)
+let best_literal (m : guess_model) = function
+  | c::d -> let l = List.fold_left (fun x ((_,v) as lit) ->
+      if not (PA.get m v).defined then lit else x) (NoNeg, -1) c in
+    (d, Some l)
+  | [] -> ([], None)
 
 let extract_atom (l : clause) =
   List.fold_left (fun d x ->
       if l = [x] then d else (x, List.filter (fun y -> y<>x) l)::d) [] l
 
-let unit_deal (m : guess_model) (f : formula_sat) =
-  let update (m,(f : formula_sat)) (b,c) =
-    if b then (m,((b,c)::f : formula_sat)) else
-      let (m, modif) = unit m c in
-      if modif then (m, (true,c)::f) else (m, (b,c)::f)
+let unit_deal (m : guess_model) (f : formula) =
+  let update (m,(f : formula)) c =
+    let (m, modif) = unit m c in
+    if modif then (m, f) else (m, c::f)
   in
   List.fold_left update (m, []) f
 
-let dpll (m : guess_model) (f : formula_sat) =
-  let rec step (m : guess_model) (f : formula_sat) =
+let dpll (m : guess_model) (f : formula) =
+  let rec step (m : guess_model) (f : formula) =
     let (m,f) = unit_deal m f in
     let (f, (stop, valid)) = success_fail m f in
     if stop then None else if valid then Some m else
-      match best_literal m with
-      | None -> None
+      let (f',l) = best_literal m f in match l with
+      | None -> None (* No solution (may need to bactrack) *)
       | Some l
-        -> match step (decide m l) f with
-        | Some _ as x -> x
-        | None
+        -> match step (decide m l) f' with
+        | Some _ as x -> x (* Model found! *)
+        | None (* Bactrack *)
           -> step (PA.set m (snd l) {var = (snd l); neg = inverse_neg (fst l);
                                      defined = true; guessed = false}) f
   in
@@ -190,9 +177,7 @@ let solve cnf =
   let make_model cnf =
     PA.init cnf.nb_var (fun i-> {var = i; neg = NoNeg;
                                  defined = false; guessed = false}) in
-  let initialize f =
-    List.fold_left (fun l x -> (false,x)::l) [] f in
-  match dpll (make_model cnf) (initialize cnf.f) with
+  match dpll (make_model cnf) cnf.f with
   | None -> None
   | Some m -> let model = to_simple_model m in assert (test_model cnf model);
     Some model
