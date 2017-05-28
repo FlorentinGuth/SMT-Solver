@@ -170,3 +170,19 @@ let explain t i j =
   in
   zip_2_by_2 pi (zip_2_by_2 pj [])
 
+
+(** Test function *)
+let test () =
+  let t = create 5 in
+  union t 0 1;
+  union t 2 3;
+  union t 1 3;
+  let explain (i,j) = Printf.printf"explain %d %d: " i j;
+    List.iter(fun(i,j)->Printf.printf"%d=%d "i j)(explain t i j);Printf.printf"\n" in
+  let rec zip u = function
+    | [] -> []
+    | x :: xs -> (List.map (fun y -> (y, x)) u) @ (zip u xs)
+  in
+  let v = [0;1;2;3] in
+  List.iter explain (zip v v)
+
