@@ -12,7 +12,7 @@ type cnf = {
 }
 
 type model = bool array     (** An assignment of all variables *)
-
+type pseudo_model = (bool option) array
 
 val print_var     : Format.formatter -> var     -> unit
 val print_neg     : Format.formatter -> neg     -> unit
@@ -26,4 +26,4 @@ val print_model   : Format.formatter -> model   -> unit
 val test_model    : cnf -> model -> bool
 
 (** This function solves the given CNF, returning a model if satisfiable or None otherwise *)
-val solve : cnf -> model option
+val solve : cnf -> (pseudo_model -> formula) -> model option

@@ -25,7 +25,7 @@ module PA = Persistent_array
 (** A guess model a persistent array of assignments of the variables, 
  *  0 meaning assigned to false, 1, assigned to true and 2, unassigned *)
 type guess_model = literal PA.t
-
+type pseudo_model = (bool option) array
 type model = bool array     (** An assignment of all variables *)
 
 
@@ -87,6 +87,11 @@ let solve_all cnf =
 let to_simple_model (m : guess_model) =
   (PA.map (fun x -> x.neg = NoNeg) m : model)
 
+let to_pseudo_model (m : guess_model) =
+  PA.map (function
+       | { defined = false; _ } -> None
+       | { neg; _ } -> Some (neg = NoNeg) ) m
+
 let inverse_neg = function
   | Neg -> NoNeg
   | NoNeg -> Neg
@@ -131,13 +136,13 @@ let success (m : guess_model) (f : formula) =
   List.fold_left (fun x c -> if x then model_implies m c else x) true f
 
 let success_fail (m : guess_model) (f : formula) =
-  let prune (f, (stop, valid)) c =
-    if stop then (f, (stop, valid)) else
+  let prune (f, stop) c =
+    if stop then (f, stop) else
       let (fail, unknown) = check_model m (false, false) c in
       let check = not (fail || unknown) in
-      ( (if check then f else c::f : formula),
-         ((if (not unknown) && fail then true else false), valid && check)) in
-  List.fold_left prune ([], (false, true)) f
+      ( (if check then f (* clause is satisfied *) else c::f : formula),
+        (if (not unknown) && fail then true else false)) in
+  List.fold_left prune ([], false) f
 
 let best_literal (m : guess_model) = function
   | c::d -> let l = List.fold_left (fun x ((_,v) as lit) ->
@@ -156,28 +161,31 @@ let unit_deal (m : guess_model) (f : formula) =
   in
   List.fold_left update (m, []) f
 
-let dpll (m : guess_model) (f : formula) =
+let dpll (m : guess_model) (f : formula) check =
   let rec step (m : guess_model) (f : formula) =
     let (m,f) = unit_deal m f in
-    let (f, (stop, valid)) = success_fail m f in
-    if stop then None else if valid then Some m else
-      let (f',l) = best_literal m f in match l with
-      | None -> None (* No solution (may need to bactrack) *)
-      | Some l
-        -> match step (decide m l) f' with
-        | Some _ as x -> x (* Model found! *)
-        | None (* Bactrack *)
-          -> step (PA.set m (snd l) {var = (snd l); neg = inverse_neg (fst l);
-                                     defined = true; guessed = false}) f
+    let (f, stop) = success_fail m f in
+    if stop then (None, []) else
+      let f = if f = [] then check (to_pseudo_model m) else f in
+      if f = [] then (Some m, []) else
+        let (f',l) = best_literal m f in match l with
+        | None -> (None, f) (* No solution (may need to bactrack) *)
+        | Some l
+          -> match step (decide m l) f' with
+          | (Some _, _) as x -> x (* Model found! *)
+          | (None, f'') (* Bactrack *)
+            -> step (PA.set m (snd l) {var = (snd l); neg = inverse_neg (fst l);
+                                       defined = true; guessed = false})
+                 (List.rev_append f'' f)
   in
   step m f
 
 
-let solve cnf =
+let solve cnf check =
   let make_model cnf =
     PA.init cnf.nb_var (fun i-> {var = i; neg = NoNeg;
                                  defined = false; guessed = false}) in
-  match dpll (make_model cnf) cnf.f with
+  match fst (dpll (make_model cnf) cnf.f check) with
   | None -> None
   | Some m -> let model = to_simple_model m in assert (test_model cnf model);
     Some model
