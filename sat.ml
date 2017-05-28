@@ -144,11 +144,17 @@ let success_fail (m : guess_model) (f : formula) =
         (if (not unknown) && fail then true else false)) in
   List.fold_left prune ([], false) f
 
-let best_literal (m : guess_model) = function
-  | c::d -> let l = List.fold_left (fun x ((_,v) as lit) ->
-      if not (PA.get m v).defined then lit else x) (NoNeg, -1) c in
-    (d, Some l)
-  | [] -> ([], None)
+(* This function assumes that no clause left is valid *)
+let first_literal (m : guess_model) (c : clause) =
+  List.fold_left (fun x ((_,v) as lit) ->
+      if not (PA.get m v).defined then lit else x) (NoNeg, -1) c
+
+let rand_literal (m : guess_model) =
+  let (l,size) = PA.fold_left (fun (l,s) x -> match x with
+      | { defined = true; _ } -> (l,s)
+      | { var = v; _ } -> (v::l, s+1) ) ([],0) m in
+  let r = Random.int size in
+  (((if Random.bool () then NoNeg else Neg), List.nth l r) : atom)
 
 let extract_atom (l : clause) =
   List.fold_left (fun d x ->
@@ -162,23 +168,22 @@ let unit_deal (m : guess_model) (f : formula) =
   List.fold_left update (m, []) f
 
 let dpll (m : guess_model) (f : formula) check =
-  let rec step (m : guess_model) (f : formula) =
+  let rec step (m : guess_model) (f : formula) k =
     let (m,f) = unit_deal m f in
     let (f, stop) = success_fail m f in
-    if stop then (None, []) else
+    if stop then k (None, []) else
       let f = if f = [] then check (to_pseudo_model m) else f in
-      if f = [] then (Some m, []) else
-        let (f',l) = best_literal m f in match l with
-        | None -> (None, f) (* No solution (may need to bactrack) *)
-        | Some l
-          -> match step (decide m l) f' with
+      match f with
+      | [] -> k (Some m, [])
+      (*| c::f' -> let l = first_literal m c in step (decide m l) f' (function*)
+      | _ as f' -> let l = rand_literal m in step (decide m l) f' (function
           | (Some _, _) as x -> x (* Model found! *)
           | (None, f'') (* Bactrack *)
             -> step (PA.set m (snd l) {var = (snd l); neg = inverse_neg (fst l);
                                        defined = true; guessed = false})
-                 (List.rev_append f'' f)
+                 (List.rev_append f'' f) k)
   in
-  step m f
+  step m f (fun x-> x)
 
 
 let solve cnf check =
