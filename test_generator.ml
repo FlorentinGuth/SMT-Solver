@@ -90,9 +90,9 @@ let generate name =
 
 let () =
   Arg.parse
-    [("-cl",   Arg.Set_int nb_cl,   "Number of clauses in the generated CNF (mandatory argument)");
-     ("-var",  Arg.Set_int nb_var,  "Number of variables in the generated CNF (mandatory argument)");
-     ("-func", Arg.Set_int nb_func, "Number of functions in the generated CNF (optional argument)");
+    [("-cl",    Arg.Set_int nb_cl,   "Number of clauses in the generated CNF (mandatory argument)");
+     ("-var",   Arg.Set_int nb_var,  "Number of variables in the generated CNF (mandatory argument)");
+     ("-func",  Arg.Set_int nb_func, "Number of functions in the generated CNF (optional argument)");
      ("-sat",   Arg.Unit (fun () -> sat := true),  "The CNF should be satisfiable (optional, default)");
      ("-unsat", Arg.Unit (fun () -> sat := false), "The CNF should be unsatisfiable (optional, not default)")]
     generate
