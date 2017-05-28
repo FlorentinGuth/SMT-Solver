@@ -1,6 +1,6 @@
 FLAGS = -I _build/ -use-menhir -yaccflag --explain
 
-all: clean main.native
+all: clean main.native test_generator.native
 
 
 main.byte:
@@ -10,6 +10,10 @@ main.byte:
 main.native:
 	ocamlbuild $(FLAGS) $@
 	mv $@ solve
+
+test_generator.native:
+	ocamlbuild $(FLAGS) $@
+	mv $@ generate
 
 
 clean:
