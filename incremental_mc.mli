@@ -15,6 +15,8 @@ type literal =
   | Var of var
   | App of app
 
+type eq = literal * var
+
 
 (** Creates a new incremental Model Checker structure.
     Its argument is the number of variables.
@@ -22,8 +24,25 @@ type literal =
 val create : int -> t
 
 (** Performs the equality a=b or f(a1,a2)=b on the structure *)
-val merge : t -> literal -> var -> unit
+val merge : t -> eq -> unit
 
 val are_congruent : t -> var -> var -> bool
 
-val explain : t -> var -> var -> (literal * var) list
+(** Returns a list of merges that entails the equality between the two variables.
+    Raises Not_found if the two variables are not equal
+*)
+val explain : t -> var -> var -> eq list
+
+
+(* For the ones not wanting to be incremental *)
+type model = {
+  nb_var : int;
+   eqs   : eq list;
+  neqs   : eq list;
+  var_of_app : (app,var) Hashtbl.t;
+}
+
+(** Checks a model.
+    Returns None if the model is satisfiable, and an explanation otherwise.
+*)
+val check : model -> (Mc.rel * eq) list option

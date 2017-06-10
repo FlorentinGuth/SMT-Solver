@@ -6,39 +6,36 @@ module MC  = Mc
 module IMC = Incremental_mc
 
 
-type var     = MC.var
-type func    = MC.func
-type lit     = MC.lit
-type literal = MC.literal
+type var     = IMC.var
+type app     = IMC.app
+type literal = IMC.literal
+type eq      = IMC.eq
 
 type rel     = MC.rel
-type atom    = MC.clause
+type atom    = rel * eq
 type clause  = atom   list     (* Represents a disjunction *)
 type formula = clause list     (* Represents a conjunction *)
 
 type cnf = {
-  (* nb_var   : int;              (\* Variables in the formula range from 0 to nb_vars - 1 *\) *)
-  (* nb_func  : int;              (\* Same as above for functions *\) *)
-  nb_lit   : int;              (* Same as above for literals *)
+  nb_var   : int;              (* Variables in the formula range from 0 to nb_vars - 1 *)
   (* nb_cl    : int;              (\* The number of clauses in the formula *\) *)
   f        : formula;
-  literals : literal array;    (* Maps a literal ident to the literal *)
+  var_of_app: (int*int,int) Hashtbl.t;
+  app_of_var: app option array;
 }
 
 
 let print_cnf fmt cnf =
-  let rec print_lit fmt lit =
-    match cnf.literals.(lit) with
-    | MC.Var v -> fprintf fmt "%d" v
-    | MC.Func (f, l) -> fprintf fmt "%s(%a)" f print_lit_list l
-  and print_lit_list fmt l =
-    print_list print_lit "," fmt l
+  let rec print_literal fmt lit =
+    match lit with
+    | IMC.Var v -> fprintf fmt "%d" v
+    | IMC.App (f,x) -> fprintf fmt "%d(%d)" f x
   in
   let print_rel fmt rel =
     fprintf fmt "%s" (match rel with MC.Eq -> eq_str | MC.Neq -> neq_str)
   in
-  let print_atom fmt (rel,l1,l2) =
-    fprintf fmt "%a%a%a" print_lit l1 print_rel rel print_lit l2
+  let print_atom fmt (rel,(l,v)) =
+    fprintf fmt "%a%a%d" print_literal l print_rel rel v
   in
   let print_clause fmt cl =
     print_list print_atom or_str fmt cl
@@ -57,21 +54,27 @@ let print_cnf fmt cnf =
 *)
 
 (** The type of the structure memorizing the conversion from SMT atoms to SAT atoms:
-    conv.(max i j).(min i j) is the SAT variable associated to i=j *)
+    conv.(max i j).(min i j) is the SAT variable associated to i=j.
+    Besides, conv.(i).(i) is the SAT variable associated to f(x)=i where i is var_of_app(f,x).
+*)
 type smt_sat_conv = {
   array: SAT.var option array array;
   mutable free_var: SAT.var;         (* The variables from 0 to free_var - 1 are used *)
 }
 
 let create_conv nb_var =
-  { array = Array.init nb_var (fun i -> Array.make i None); free_var = 0 }
+  { array = Array.init nb_var (fun i -> Array.make (i+1) None); free_var = 0 }
 
 type sat_atom =
   | ATrue
   | AFalse
   | Atom of SAT.atom
-let atom_to_sat conv ((rel, v1, v2) : atom) =
-  if v1 = v2 then
+let atom_to_sat conv var_of_app ((rel,(l,v2)) : atom) =
+  let (v1, eliminate_i_i) = match l with
+    | IMC.Var v1 -> (v1, true)
+    | IMC.App a  -> (Hashtbl.find var_of_app a, false)
+  in
+  if v1 = v2 && eliminate_i_i then
     match rel with
     | MC.Eq -> ATrue
     | MC.Neq -> AFalse
@@ -90,7 +93,7 @@ type sat_clause =
   | CTrue
   | CFalse
   | Clause of SAT.clause
-let clause_to_sat conv (cl : clause) =
+let clause_to_sat conv var_of_app (cl : clause) =
   let rec aux cl acc =
     match cl with
     | [] ->
@@ -100,7 +103,7 @@ let clause_to_sat conv (cl : clause) =
         Clause acc
 
     | a :: tl -> begin
-        match atom_to_sat conv a with
+        match atom_to_sat conv var_of_app a with
         | ATrue  -> CTrue             (* The clause will be always true *)
         | AFalse -> aux tl acc        (* We ignore the atom *)
         | Atom a -> aux tl (a :: acc)
@@ -112,7 +115,7 @@ type sat_formula =
   | FTrue
   | FFalse
   | Formula of SAT.formula
-let formula_to_sat conv (f : formula) =
+let formula_to_sat conv var_of_app (f : formula) =
   let rec aux f acc =
     match f with
     | [] ->
@@ -122,7 +125,7 @@ let formula_to_sat conv (f : formula) =
         Formula acc
 
     | cl :: tl -> begin
-        match clause_to_sat conv cl with
+        match clause_to_sat conv var_of_app cl with
         | CTrue -> aux tl acc  (* Ignore the always-true clause *)
         | CFalse -> FFalse
         | Clause cl -> aux tl (cl :: acc)
@@ -131,38 +134,45 @@ let formula_to_sat conv (f : formula) =
   aux f []
 
 let cnf_to_sat cnf =
-  let conv = create_conv cnf.nb_lit in
-  match formula_to_sat conv cnf.f with
+  let conv = create_conv cnf.nb_var in
+  match formula_to_sat conv cnf.var_of_app cnf.f with
   | Formula f -> (SAT.{ nb_var = conv.free_var; nb_cl = List.length f; f }, conv)
   (* TODO: Deal with the particular cases without calling the SAT solver, we can answer right away *)
-  | FTrue ->  (SAT.{ nb_var = 0; nb_cl = 0; f = [  ] }, create_conv cnf.nb_lit)
-  | FFalse -> (SAT.{ nb_var = 0; nb_cl = 1; f = [[]] }, create_conv cnf.nb_lit)
+  | FTrue ->  (SAT.{ nb_var = 0; nb_cl = 0; f = [  ] }, create_conv cnf.nb_var)
+  | FFalse -> (SAT.{ nb_var = 0; nb_cl = 1; f = [[]] }, create_conv cnf.nb_var)
 
 
 
-(** Converts a SAT model to an equality model for the Model Checker *)
-let model_to_mc (m : SAT.model) conv literals =
+let of_some = function
+  | None -> assert false
+  | Some x -> x
+
+(** Converts a SAT pseudo_model to an equality model for the Model Checker *)
+let model_to_mc (m : SAT.pseudo_model) conv var_of_app app_of_var =
   (* First, invert the conv array: maps a SAT var to a pair (i,j) (atom i=j) *)
   let nb_var_sat = conv.free_var in
   let nb_var_mc  = Array.length conv.array in
-  let inv_array = Array.make nb_var_sat (0, 0) in
+  let inv_array = Array.make nb_var_sat (IMC.Var 0, 0) in
   for i = 0 to nb_var_mc - 1 do
     for j = 0 to i - 1 do
       match conv.array.(i).(j) with
       | None -> ()
-      | Some v -> inv_array.(v) <- (i, j)
+      | Some v -> inv_array.(v) <- (IMC.Var i, j)
     done;
+    match conv.array.(i).(i) with
+    | None -> ()
+    | Some v -> inv_array.(v) <- (IMC.App (of_some app_of_var.(i)), i)
   done;
 
-  let f = ref ([] : MC.formula) in
+  let eqs = ref [] in
+  let neqs = ref [] in
   for v = 0 to nb_var_sat - 1 do
-    let a = match (m.(v), inv_array.(v)) with
-      | (true,  (i, j)) -> (MC.Eq,  i, j)
-      | (false, (i, j)) -> (MC.Neq, i, j)
-    in
-    f := a :: !f;
+    match (m.(v), inv_array.(v)) with
+    | (Some true,  (i, j)) ->  eqs := (i, j) :: ! eqs
+    | (Some false, (i, j)) -> neqs := (i, j) :: !neqs
+    | (None, _) -> () (* Ignoring unaffected variables *)
   done;
-  MC.{ nb_lit = nb_var_mc; f = !f; literals; }
+  IMC.{ nb_var = nb_var_mc; eqs = !eqs; neqs = !neqs; var_of_app }
 
 
 
@@ -173,27 +183,34 @@ let neg_rel = function
   | MC.Neq -> MC. Eq
 
 let neg_atom (a : atom) =
-  let (rel, v1, v2) = a in
-  ((neg_rel rel, v1, v2) : atom)
-
-let add_model_neg cnf (m : MC.model) =
-    { cnf with f = (List.map neg_atom m.MC.f) :: cnf.f; }
+  let (rel, eq) = a in
+  ((neg_rel rel, eq) : atom)
 
 
-let rec satisfiable cnf =
+let satisfiable cnf =
   (*print_stdout "CNF: %a\n" print_cnf cnf;*)
   let (sat_cnf, conv) = cnf_to_sat cnf in
+  let conv = ref conv in
+  let cnf = ref cnf in
+  let check pseudo_model =
+    let m_mc = model_to_mc pseudo_model !conv !cnf.var_of_app !cnf.app_of_var in
+    (* print_stdout "Calling Model Checker on %a\n" IMC.print_model m_mc; *)
+    match IMC.check m_mc with
+    | None ->
+      print_stdout "Model Checker validated the model\n";
+      []
+
+    | Some l ->
+      print_stdout "Model Checker invalidated the model, adding negation\n";
+      let neg_expl = List.map neg_atom l in
+      cnf := {!cnf with f = neg_expl :: !cnf.f };
+      let (sat_cnf, conv') = cnf_to_sat !cnf in
+      conv := conv';
+      sat_cnf.SAT.f
+  in
   print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf;
   match SAT.solve sat_cnf with
   | None -> print_stdout "Unsatisfiable SAT formula\n"; false
   | Some m -> print_stdout "SAT found model %a\n" SAT.print_model m;
     assert (SAT.test_model sat_cnf m);
-    let m_mc = model_to_mc m conv cnf.literals in
-    print_stdout "Calling Model Checker on %a\n" MC.print_model m_mc;
-    if MC.check m_mc then begin
-      print_stdout "Model Checker validated the model\n";
-      true
-    end else begin
-      print_stdout "Model Checker invalidated the model, adding negation\n";
-      satisfiable (add_model_neg cnf m_mc)
-    end
+    true

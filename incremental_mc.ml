@@ -8,6 +8,7 @@ type literal =
   | Var of var
   | App of app
 
+type eq     = literal * var
 type var_eq = var * var
 type app_eq = app * var
 
@@ -80,7 +81,7 @@ let rec propagate t =
       propagate t
     end
 
-let merge t literal a =
+let merge t (literal,a) =
   match literal with
   | Var b ->
     t.pending <- (Vars (a, b)) :: t.pending;
@@ -146,9 +147,36 @@ let print_equality_list fmt l =
 let test () =
   (* 0:f 1:g 2:x 3:y 4:f(x) 5:g(y); x=y, f=g => f(x)=g(y) *)
   let t = create 6 in
-  merge t (Var 0) 1;
-  merge t (Var 2) 3;
-  merge t (App (0,2)) 4;
-  merge t (App (1,3)) 5;
+  merge t ((Var 0),1);
+  merge t ((Var 2),3);
+  merge t ((App (0,2)),4);
+  merge t ((App (1,3)),5);
   Printer.print_stdout "%a\n" print_equality_list (explain t 4 5)
 (* let () = test () *)
+
+
+type model = {
+  nb_var : int;
+   eqs   : eq list;
+  neqs   : eq list;
+  var_of_app : (app,var) Hashtbl.t;
+}
+
+let check m =
+  let t = create m.nb_var in
+  List.iter (merge t) m.eqs;
+  let rec check_neqs = function
+    | [] ->
+      None
+
+    | neq :: neqs ->
+      let (v1,v2) = match neq with
+        | (Var v1,v2) -> (v1,v2)
+        | (App a, v2) -> (Hashtbl.find m.var_of_app a,v2)
+      in
+      if are_congruent t v1 v2 then
+        Some ((Mc.Neq,neq) :: (List.map (fun eq -> (Mc.Eq,eq)) (explain t v1 v2)))
+      else
+        check_neqs neqs
+  in
+  check_neqs m.neqs
