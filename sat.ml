@@ -227,7 +227,7 @@ let dpll (m : guess_model) (f : formula) check count nb_var =
    * VSIDS decision heuristic
   *)
 
-  let counter = ref 0 in
+  let counter = ref 1 in
 
   let set_count f =
     let rec set_count_aux = function
@@ -243,8 +243,7 @@ let dpll (m : guess_model) (f : formula) check count nb_var =
 
   let max_array (m : guess_model) =
     let rec foldi i_max max positive n =
-      if n = 0 then (Format.printf "Max is: %d@." max;
-        (((if positive then NoNeg else Neg), i_max) : atom)) else
+      if n = -1 then (((if positive then NoNeg else Neg), i_max) : atom) else
         let (pos,neg) = count.(n) in
         let c = pos + neg in
         if max >= c || (PA.get m n).defined
@@ -268,10 +267,14 @@ let dpll (m : guess_model) (f : formula) check count nb_var =
     let (m,f) = unit_deal m f in
     let (f, stop) = success_fail m f in
     if stop then k (None, []) else
-      let f = if f = []
-        then let g = check (to_pseudo_model m) in set_count g; g
-        else f in
-      match f with
+      let (f,back) = begin
+        if f = []
+        then let g = check (to_pseudo_model m) in
+          (if g = [] then (g, false)
+           else (set_count g; (g, true)))
+        else (f, false) end in
+      if back then k (None, f) else
+        match f with
       | [] -> k (Some m, []) (* A valid model was found! *)
       | _  -> let (l,f') = (max_array m, f) in
                 (* if Random.bool () (* Two heuristics are used *)
@@ -298,5 +301,4 @@ let solve cnf check =
                                  defined = false; guessed = false}) in
   match fst (dpll (make_model cnf) cnf.f check count (cnf.nb_var-1)) with
   | None -> None
-  | Some m -> let model = to_simple_model m in assert (test_model cnf model);
-    Some model
+  | Some m -> let model = to_simple_model m in Some model

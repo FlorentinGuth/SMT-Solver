@@ -188,7 +188,7 @@ let neg_atom (a : atom) =
 
 
 let satisfiable cnf =
-  print_stdout "CNF: %a\n" print_cnf cnf;
+  (* print_stdout "CNF: %a\n" print_cnf cnf; *)
   let (sat_cnf, conv) = cnf_to_sat cnf in
   let conv = ref conv in
   let cnf = ref cnf in
@@ -197,20 +197,30 @@ let satisfiable cnf =
     (* print_stdout "Calling Model Checker on %a\n" IMC.print_model m_mc; *)
     match IMC.check m_mc with
     | None ->
-      print_stdout "Model Checker validated the model\n";
+      (* print_stdout "Model Checker validated the model\n"; *)
       []
 
     | Some l ->
       print_stdout "Model Checker invalidated the model, adding negation\n";
       let neg_expl = List.map neg_atom l in
-      cnf := {!cnf with f = neg_expl :: !cnf.f };
-      let (sat_cnf, conv') = cnf_to_sat !cnf in
-      conv := conv';
+      let val_cnf = !cnf in
+      let conv_expl = create_conv val_cnf.nb_var in
+      let sat_cnf = match formula_to_sat conv_expl val_cnf.var_of_app [neg_expl]
+        with
+        | Formula f -> SAT.{ nb_var = conv_expl.free_var;
+                             nb_cl = List.length neg_expl; f }
+        | FTrue     -> SAT.{ nb_var = 0; nb_cl = 0; f = [  ] }
+        | FFalse    -> SAT.{ nb_var = 0; nb_cl = 1; f = [[]] } in
+      cnf := {val_cnf with f = neg_expl :: val_cnf.f };
+      conv:= create_conv val_cnf.nb_var;
+      (match formula_to_sat !conv val_cnf.var_of_app !cnf.f with
+       | Formula _      -> ()
+       | FTrue | FFalse -> conv := create_conv val_cnf.nb_var);
       sat_cnf.SAT.f
   in
-  print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf;
+  (* print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf; *)
   match SAT.solve sat_cnf check with
-  | None -> print_stdout "Unsatisfiable SAT formula\n"; false
-  | Some m -> print_stdout "SAT found model %a\n" SAT.print_model m;
+  | None -> (* print_stdout "Unsatisfiable SAT formula\n"; *) false
+  | Some m -> (* print_stdout "SAT found model %a\n" SAT.print_model m; *)
     assert (SAT.test_model sat_cnf m);
     true
