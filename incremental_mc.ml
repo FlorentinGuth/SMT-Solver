@@ -157,7 +157,7 @@ let test () =
 
 type model = {
   nb_var : int;
-   eqs   : eq list;
+  eqs    : eq list;
   neqs   : eq list;
   var_of_app : (app,var) Hashtbl.t;
 }

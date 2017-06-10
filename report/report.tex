@@ -1,0 +1,183 @@
+\documentclass[a4paper, 10pt, french]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[frenchb]{babel}
+\usepackage{lmodern}
+\usepackage[autolanguage]{numprint}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{tabularx} \newcolumntype{C}{>{\centering}X}
+\usepackage{multirow}
+\usepackage{hhline}
+\usepackage{collcell}
+\usepackage{subcaption}
+\usepackage[stable]{footmisc}
+\usepackage[nottoc, notlof, notlot]{tocbibind}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{multicol}
+\usepackage[10pt]{moresize}
+\usepackage{pdflscape}
+
+
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{amsopn}
+\usepackage{stmaryrd}
+
+\DeclareCaptionLabelFormat{listing}{Listing #2}
+\DeclareCaptionSubType*[arabic]{table}
+\captionsetup[subtable]{labelformat=simple}
+
+\usepackage[langlinenos=true,newfloat=true]{minted}
+\newcommand{\source}[5]{
+  \begin{table}[H]
+    \centering
+    \small
+\inputminted[frame=lines,linenos,style=colorful,fontfamily=tt,breaklines,
+autogobble,firstline=#3,firstnumber=#3,lastline=#4,label={#2[#3--#4]}]{#1
+}{../#2}
+    
+\captionsetup{name=Listing,labelformat=listing,labelsep=endash,labelfont={sc}}
+    \caption{#5}
+  \end{table}
+  }
+
+\newcommand{\codeOCaml}[1]{\mintinline[style=colorful,fontfamily=tt]{OCaml}{#1}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\foreign}[1]{\emph{#1}}
+
+
+
+\title{Projet de Sémantique et Vérification : Solveur \foreign{SMT}}
+\author{Florentin \bsc{Guth} \and Lionel \bsc{Zoubritzky}}
+
+\begin{document}
+
+\maketitle
+
+
+\tableofcontents
+
+
+\section{Liste des fichiers}
+
+\subsection{Structures de données}
+
+\begin{itemize}
+ \item \code{union\string_find.ml} : sructure d'\foreign{union-find} classique 
+(mutable),
+ \item \code{persistent\string_array.ml} : implémente les tableaux non mutables 
+de \cite{PersistentUF},
+ \item \code{persistent\string_union\string_find.ml} : implémente la structure 
+d'\foreign{union-find} non mutable de \cite{PersistentUF},
+\item \code{explain\string_union\string_find.ml} : implémente un 
+\foreign{union-find} permettant d'expliquer pourquoi deux éléments donnés sont 
+équivalents (voir \cite{ExplainUF}),
+\item \code{proof\string_union\string_find.ml} : \foreign{union-find} 
+auxiliaire utilisé par l'algorithme d'explication (voir \cite{ExplainUF}).
+\end{itemize}
+
+\subsection{Fichiers auxiliaires}
+
+\begin{itemize}
+ \item \code{lexer.mll} : lexeur pour les fichiers \code{.cnfuf} (améliorés 
+avec la prise en charge des fonctions),
+ \item \code{parser.mly} : parseur pour les fichiers \code{.cnfuf}, réalisant 
+une curryfication et un \og désenbriquement \fg\ des termes,
+ \item \code{printer.ml} : fonctions d'affichages générales,
+ \item \code{main.ml} : point d'entrée, lit la ligne de commande et effectue la 
+résolution des fichiers donnés,
+ \item \code{test\string_generator.ml} : générateur de tests aléatoires, ne 
+gère ni les fonctions ni les formules non satisfiables,
+ \item \code{Makefile} : \code{make all} pour compiler le solveur 
+(\code{solve}) et le générateur de tests (\code{generate}), et \code{make 
+clean} pour nettoyer les fichiers créés.
+\end{itemize}
+
+\subsection{Fichiers principaux}
+
+\begin{itemize}
+ \item \code{sat.ml} : solveur \foreign{SAT} prenant en entrée une formule 
+booléenne, et renvoyant un assignement le cas échéant,
+ \item \code{mc.ml} : ancien \foreign{Model Checker}, non incrémental,
+ \item \code{incremental\string_mc.ml} : \foreign{Model Checker} incrémental, 
+mais non \foreign{backtrackable},
+ \item \code{smt.ml} : fichier principal réalisant l'interfaçage entre le 
+solveur \foreign{SAT} et le \foreign{Model Checker}.
+\end{itemize}
+
+
+\section{Fonctionnement général}
+
+\subsection{\foreign{Model Checker}}
+
+Nous avons choisi la théorie de l'égalité, augmentée des symboles de fonction 
+non-interprétés (d'arité quelconque).
+
+Pour cela, on procède à une transformation sur la formule d'entrée afin de 
+simplifier la forme des égalités :
+\source{OCaml}{incremental\string_mc.mli}{7}{13}{Transformation}
+
+On fournit une interface incrémentale, qui permet de plus de produire des 
+explications pour les égalités inférées, sous forme de (petite) liste de 
+fusions effectuées préalablement.
+\source{OCaml}{incremental\string_mc.mli}{21}{34}{Interface du \foreign{Model 
+Checker}}
+
+Cependant, cette interface incrémentale n'est de peu d'utilité, puisqu'elle 
+n'est pas persistante. Ainsi, le \foreign{backtracking} est impossible, et il 
+faut tout recommencer de zéro à chaque modèle trouvé par le solveur 
+\foreign{SAT}.
+
+Les explications permettent en revanche d'ajouter des petites clauses à la 
+formule à chaque appel du \foreign{Model Checker}, ce qui a pour conséquence, 
+en plus d'augmenter la vitesse du solveur \foreign{SAT}, de produire des 
+contre-exemples plus généraux et réduit grandement le nombre d'itérations entre 
+les deux outils. \\
+
+Concrètement, les explications sont générées en stockant, en parallèle de la 
+structure d'\foreign{union-find} classique, une structure appelée \og forêt de 
+preuve \fg. Celle-ci correspond à l'arbre \foreign{union-find}, mais sans 
+compression de chemin, et en réalisant des fusions qui correspondent réellement 
+à des égalités.
+
+
+\subsection {Solveur \foreign{SAT}}
+
+
+\section{Améliorations}
+
+Le caractère extrêmement brouillon de \cite{ExplainUF} a conduit à une 
+multiplication de structures de données tout en ayant un code peu modulaire, et 
+dont l'efficacité et la simplicité pourraient être grandement améliorées. Les 
+améliorations proposées dans l'article sur la suppression de la redondance dans 
+les preuves fournies n'ont pas été implémentées.
+
+Une grande amélioration serait d'utiliser des idées similaires à celle de 
+\cite{PersistentUF} afin d'obtenir un \foreign{Model Checker} totalement 
+immutable, ce qui permettrait le \foreign{backtracking} et accélererait sans 
+doute grandement la vitesse du solveur.
+
+Il reste également à compléter le générateur de tests afin qu'il gère toutes 
+les configurations et produise des tests plus difficiles (i.e. des formules 
+vraies pour peu d'assignements).
+
+Nous n'avons pas essayé d'implémenter un solveur \foreign{SAT} \foreign{CDCL} 
+afin de comparer son efficacité au solveur \foreign{DPLL}.
+
+Il suffirait d'une petite modification de l'algorithme pour qu'il renvoie les 
+classes d'équivalences des différentes variables une fois un assignement trouvé 
+(bien qu'il faudrait faire la conversion du \foreign{parsing} dans l'autre 
+sens). On pourrait aussi imaginer que dans le cas ou la formule n'est pas 
+satisfiable, le solveur produit une preuve de ceci, vérifiable par un programme 
+externe comme \foreign{Coq}.
+
+
+\bibliographystyle{plain}
+\bibliography{report}
+
+\end{document}

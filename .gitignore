@@ -2,3 +2,8 @@ _build/
 solve
 generate
 **#**
+
+report/**
+!report.pdf
+!report.tex
+!report.bib

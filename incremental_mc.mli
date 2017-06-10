@@ -6,10 +6,10 @@ type var = int
 type app = var * var
 (** A literal can only be of two types:
     - either a variable (which can actually be a function!)
-    - the application of a unique function (@) to two variables
+    - the application of a unique function (the application, noted 'f' here) to two variables
     Moreover, a clause is either a=b, a<>b or f(a,b)=c
     For instance, g(a,h(b),b)=b is replaced by f(f(f(g,a),f(h,b)),b)=b (currifying)
-    and then by f(g,a)=c /\ f(h,b)=d /\ f(c,d)=e /\ f(e,b)=b (flattening)
+    and then by f(g,a)=c /\ f(h,b)=d /\ f(c,d)=e /\ f(e,b)=b           (flattening)
 *)
 type literal =
   | Var of var
@@ -37,7 +37,7 @@ val explain : t -> var -> var -> eq list
 (* For the ones not wanting to be incremental *)
 type model = {
   nb_var : int;
-   eqs   : eq list;
+  eqs    : eq list;
   neqs   : eq list;
   var_of_app : (app,var) Hashtbl.t;
 }

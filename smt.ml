@@ -20,7 +20,7 @@ type cnf = {
   nb_var   : int;              (* Variables in the formula range from 0 to nb_vars - 1 *)
   (* nb_cl    : int;              (\* The number of clauses in the formula *\) *)
   f        : formula;
-  var_of_app: (int*int,int) Hashtbl.t;
+  var_of_app: (app,var) Hashtbl.t;
   app_of_var: app option array;
 }
 
