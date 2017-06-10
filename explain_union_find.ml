@@ -89,17 +89,19 @@ and explain_first t unions i j =
 *)
 
 type t = {
-  parent : int array;
-  proof  : int array;  (* The proof forest *)
-  rank   : int array;
+  parent  : int array;
+  proof   : int array;  (* The proof forest *)
+  rank    : int array;
+  hi_node : int array;  (* Parent in the proof forest *)
 }
 
 
 let create n =
   {
-    parent = Array.init n (fun i -> i);
-    proof  = Array.init n (fun i -> i);
-    rank   = Array.init n (fun _ -> 0);
+    parent  = Array.init n (fun i -> i);
+    proof   = Array.init n (fun i -> i);
+    hi_node = Array.init n (fun i -> i);
+    rank    = Array.init n (fun _ -> 0);
   }
 
 (* Function find with provided parent array, and optional path compression *)
@@ -113,8 +115,11 @@ let rec find_aux parent path_cpr i =
 let find t i =
   find_aux t.parent true i
 
-let find_proof t i =
+let highest_node t i =
   find_aux t.proof false i
+
+let proof_parent t i =
+  t.proof.(i)
 
 
 let union t i j =
@@ -130,7 +135,8 @@ let union t i j =
     in
     reverse j j;
     (* Finally performs the merge, j is now the representative of its class *)
-    t.proof.(j) <- i
+    t.proof.(j) <- i;
+    t.hi_node.(pi) <- j
   in
   let pi = find t i in
   let pj = find t j in
@@ -145,6 +151,21 @@ let union t i j =
       real_union i j pi pj;
       t.rank.(pi) <- ri + 1
     end
+
+
+let nearest_common_ancestor t a b =
+  let rec path k acc =
+    let pk = t.proof.(k) in
+    if k = pk then k :: acc else path pk (k :: acc)
+  in
+  let rec no_common_part u v last_removed =
+    match (u, v) with
+    | (x::xs, y::ys) when x = y -> no_common_part xs ys (Some x)
+    | _ -> match last_removed with
+      | None -> raise Not_found
+      | Some x -> x
+  in
+  no_common_part (path a []) (path b []) None
 
 
 (* TODO not optimal complexity: O(height of tree) instead of O(k) *)
@@ -173,9 +194,9 @@ let explain t i j =
 
 (** Test function *)
 let test () =
-  let t = create 5 in
+  let t = create 4 in
   union t 0 1;
-  union t 2 3;
+  union t 1 2;
   union t 1 3;
   let explain (i,j) = Printf.printf"explain %d %d: " i j;
     List.iter(fun(i,j)->Printf.printf"%d=%d "i j)(explain t i j);Printf.printf"\n" in
@@ -184,5 +205,8 @@ let test () =
     | x :: xs -> (List.map (fun y -> (y, x)) u) @ (zip u xs)
   in
   let v = [0;1;2;3] in
-  List.iter explain (zip v v)
-
+  List.iter explain (zip v v);
+  let print_array a = Array.iteri (fun i x -> Printf.printf "%d:%d " i x) a; Printf.printf"\n" in
+  print_array t.parent; print_array t.proof; (*print_array t.hi_node;*)
+  Printf.printf "%d\n" (nearest_common_ancestor t 2 3)
+(* let () = test () *)

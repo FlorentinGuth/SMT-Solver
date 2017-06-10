@@ -1,4 +1,5 @@
-module UF = Explain_union_find
+module EUF = Explain_union_find
+module PUF = Proof_union_find
 
 
 type var = int
@@ -20,7 +21,8 @@ type t = {
   use: app_eq list array;
   (* lookup.(b).(c) is f(a1,a2)=a iff b and c are the representatives of a1 and a2 *)
   lookup: (var * var, app_eq) Hashtbl.t;
-  uf: UF.t;
+  euf: EUF.t;
+  puf: PUF.t;
   edges_label : (var * var, app_eq * app_eq) Hashtbl.t;
 }
 
@@ -31,9 +33,17 @@ let create n =
     pending = [];
     use     = Array.make n [];
     lookup  = Hashtbl.create n;
-    uf      = UF.create n;
+    euf = EUF.create n;
+    puf = PUF.create n;
     edges_label = Hashtbl.create n;
   }
+
+
+let find_label t (a,b) =
+  try
+    Hashtbl.find t.edges_label (a,b)
+  with Not_found ->
+    Hashtbl.find t.edges_label (b,a)
 
 
 let rec propagate t =
@@ -41,24 +51,24 @@ let rec propagate t =
   | [] -> ()
   | (Vars (a, b) as eq) :: tl | (Apps ((_, a), (_, b)) as eq) :: tl ->
     t.pending <- tl;
-    let old_repr_a = UF.find t.uf a in
-    let old_repr_b = UF.find t.uf b in
+    let old_repr_a = EUF.find t.euf a in
+    let old_repr_b = EUF.find t.euf b in
     if old_repr_a <> old_repr_b then begin
-      UF.union t.uf a b;
+      EUF.union t.euf a b;
       let () = match eq with
         | Vars _ -> ()
         | Apps (e1,e2) -> Hashtbl.add t.edges_label (a,b) (e1,e2)
       in
-      let a' = UF.find t.uf a in
-      let b' = UF.find t.uf b in
+      let a' = EUF.find t.euf a in
+      let b' = EUF.find t.euf b in
       let (a,b,old_repr_a,old_repr_b,a',b') = if b' = old_repr_a
         then (b,a,old_repr_b,old_repr_a,a',b')
         else (a,b,old_repr_a,old_repr_b,b',a')
       in
       List.iter (fun app_eq ->
                   let ((c1,c2),_c) = app_eq in  (* f(c1,c2)=c *)
-                  let c1' = UF.find t.uf c1 in
-                  let c2' = UF.find t.uf c2 in
+                  let c1' = EUF.find t.euf c1 in
+                  let c2' = EUF.find t.euf c2 in
                   try
                     let app_eq2 = Hashtbl.find t.lookup (c1',c2') in
                     t.pending <- (Apps (app_eq, app_eq2)) :: t.pending
@@ -77,8 +87,8 @@ let merge t literal a =
     propagate t
 
   | App (a1,a2) ->
-    let a1' = UF.find t.uf a1 in
-    let a2' = UF.find t.uf a2 in
+    let a1' = EUF.find t.euf a1 in
+    let a2' = EUF.find t.euf a2 in
     try
       let app_eq = Hashtbl.find t.lookup (a1',a2') in
       t.pending <- (Apps (((a1,a2),a), app_eq)) :: t.pending;
@@ -91,19 +101,53 @@ let merge t literal a =
 
 
 let are_congruent t a b =
-  UF.find t.uf a = UF.find t.uf b
+  EUF.find t.euf a = EUF.find t.euf b
+
 
 
 let rec get_real_explanation t vars acc =
   try
-    let (((a1,a2),_), ((b1,b2),_)) = Hashtbl.find t.edges_label vars in
-    (explain t a1 b1) @ (explain t a2 b2)
+    let (((a1,a2),a), ((b1,b2),b)) = find_label t vars in
+    explain_aux t a1 b1 (explain_aux t a2 b2 ((App (a1,a2),a) :: (App (b1,b2),b) :: acc))
   with Not_found ->
     let (v1,v2) = vars in
-    [(Var v1,v2)]
+    (Var v1,v2) :: acc
 
-and explain_along_path t a c =
+and explain_along_path t a c acc =
+  (* c is an ancestor of a *)
+  let rec aux a acc =
+    let a = PUF.highest_node t.puf a in
+    if a = c then acc else
+      let b = EUF.proof_parent t.euf a in
+      get_real_explanation t (a,b) (aux b acc)
+  in
+  aux a acc
 
+and explain_aux t a b acc =
+  let c = EUF.nearest_common_ancestor t.euf a b in
+  explain_along_path t a c (explain_along_path t b c acc)
 
 and explain t a b =
-  []
+  let res = explain_aux t a b [] in
+  PUF.reset t.puf;
+  res
+
+
+
+let print_literal fmt = function
+  | Var a -> Format.fprintf fmt "%d" a
+  | App (a1,a2) -> Format.fprintf fmt "%d(%d)" a1 a2
+let print_equality fmt (l,v) =
+  Format.fprintf fmt "%a=%d" print_literal l v
+let print_equality_list fmt l =
+  Printer.print_list print_equality " " fmt l
+
+let test () =
+  (* 0:f 1:g 2:x 3:y 4:f(x) 5:g(y); x=y, f=g => f(x)=g(y) *)
+  let t = create 6 in
+  merge t (Var 0) 1;
+  merge t (Var 2) 3;
+  merge t (App (0,2)) 4;
+  merge t (App (1,3)) 5;
+  Printer.print_stdout "%a\n" print_equality_list (explain t 4 5)
+(* let () = test () *)

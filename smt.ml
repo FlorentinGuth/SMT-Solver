@@ -3,6 +3,7 @@ open Printer
 
 module SAT = Sat
 module MC  = Mc
+module IMC = Incremental_mc
 
 
 type var     = MC.var

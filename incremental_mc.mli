@@ -2,7 +2,8 @@
 type t
 
 (** The types of the formula used by the Model Checker *)
-type var     = int
+type var = int
+type app = var * var
 (** A literal can only be of two types:
     - either a variable (which can actually be a function!)
     - the application of a unique function (@) to two variables
@@ -12,7 +13,7 @@ type var     = int
 *)
 type literal =
   | Var of var
-  | App of var * var
+  | App of app
 
 
 (** Creates a new incremental Model Checker structure.
