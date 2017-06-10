@@ -203,9 +203,19 @@ let satisfiable cnf =
     | Some l ->
       print_stdout "Model Checker invalidated the model, adding negation\n";
       let neg_expl = List.map neg_atom l in
-      cnf := {!cnf with f = neg_expl :: !cnf.f };
-      let (sat_cnf, conv') = cnf_to_sat !cnf in
-      conv := conv';
+      let val_cnf = !cnf in
+      let conv_expl = create_conv val_cnf.nb_var in
+      let sat_cnf = match formula_to_sat conv_expl val_cnf.var_of_app [neg_expl]
+        with
+        | Formula f -> SAT.{ nb_var = conv_expl.free_var;
+                             nb_cl = List.length neg_expl; f }
+        | FTrue     -> SAT.{ nb_var = 0; nb_cl = 0; f = [  ] }
+        | FFalse    -> SAT.{ nb_var = 0; nb_cl = 1; f = [[]] } in
+      cnf := {val_cnf with f = neg_expl :: val_cnf.f };
+      conv:= create_conv val_cnf.nb_var;
+      (match formula_to_sat !conv val_cnf.var_of_app !cnf.f with
+       | Formula _      -> ()
+       | FTrue | FFalse -> conv := create_conv val_cnf.nb_var);
       sat_cnf.SAT.f
   in
   print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf;
