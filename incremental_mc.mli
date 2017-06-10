@@ -37,6 +37,7 @@ val explain : t -> var -> var -> eq list
 (* For the ones not wanting to be incremental *)
 type model = {
   nb_var : int;
+  nb_real_var : int;
   eqs    : eq list;
   neqs   : eq list;
   var_of_app : (app,var) Hashtbl.t;

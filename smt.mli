@@ -16,11 +16,12 @@ type clause  = atom   list     (* Represents a disjunction *)
 type formula = clause list     (* Represents a conjunction *)
 
 type cnf = {
-  nb_var     : int;                     (* Variables in the formula range from 0 to nb_vars - 1 *)
-  (* nb_cl      : int;                     (\* The number of clauses in the formula *\) *)
-  f          : formula;
-  var_of_app : (app,var) Hashtbl.t; (* Maps (f,x) to the variable f(x) *)
-  app_of_var : app option array;
+  nb_var      : int;                     (* Variables in the formula range from 0 to nb_vars - 1 *)
+  nb_real_var : int;                     (* Number of real variables, for outputting solution *)
+  (* nb_cl       : int;                     (\* The number of clauses in the formula *\) *)
+  f           : formula;
+  var_of_app  : (app,var) Hashtbl.t;     (* Maps (f,x) to the variable f(x) *)
+  app_of_var  : app option array;
 }
 
 

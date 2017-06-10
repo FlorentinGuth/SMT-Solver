@@ -157,6 +157,7 @@ let test () =
 
 type model = {
   nb_var : int;
+  nb_real_var : int;
   eqs    : eq list;
   neqs   : eq list;
   var_of_app : (app,var) Hashtbl.t;
@@ -167,6 +168,7 @@ let check m =
   List.iter (merge t) m.eqs;
   let rec check_neqs = function
     | [] ->
+      Printer.print_stdout "Model valid: %a\n@." EUF.print_classes t.euf;
       None
 
     | neq :: neqs ->

@@ -110,5 +110,5 @@ file:
     let f = Hashtbl.fold (fun (v1,v2) v f -> [(MC.Eq,(IMC.App(v1,v2),v))] :: f) var_of_app f in
     let app_of_var = Array.make !free_var None in
     Hashtbl.iter (fun a v -> app_of_var.(v) <- Some a) var_of_app;
-    { nb_var = !free_var; f; var_of_app; app_of_var }
+    { nb_var = !free_var; nb_real_var = !nb_var; f; var_of_app; app_of_var }
   }

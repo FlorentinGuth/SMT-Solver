@@ -207,3 +207,26 @@ let test () =
   print_array t.parent; print_array t.proof;
   Printf.printf "%d\n" (nearest_common_ancestor t 2 3)
 (* let () = test () *)
+
+
+
+let print_classes fmt t =
+  let n = Array.length t.parent in
+  let buckets = Array.make n [] in
+  for i = 0 to n - 1 do
+    let pi = find t i in
+    buckets.(pi) <- i :: buckets.(pi);
+  done;
+  let buckets = List.filter ((<>) []) (Array.to_list buckets) in
+  let buckets = List.map (List.sort compare) buckets in
+
+  let print_var fmt v =
+    Format.fprintf fmt "%d" (v+1)
+  in
+  let print_bucket fmt b =
+    Printer.print_list print_var Printer.eq_str fmt b
+  in
+  let print_buckets fmt bs =
+    Printer.print_list print_bucket (" " ^ Printer.neq_str ^ " ") fmt bs
+  in
+  print_buckets fmt buckets

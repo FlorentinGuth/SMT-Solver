@@ -18,6 +18,7 @@ type formula = clause list     (* Represents a conjunction *)
 
 type cnf = {
   nb_var   : int;              (* Variables in the formula range from 0 to nb_vars - 1 *)
+  nb_real_var: int;
   (* nb_cl    : int;              (\* The number of clauses in the formula *\) *)
   f        : formula;
   var_of_app: (app,var) Hashtbl.t;
@@ -148,7 +149,7 @@ let of_some = function
   | Some x -> x
 
 (** Converts a SAT pseudo_model to an equality model for the Model Checker *)
-let model_to_mc (m : SAT.pseudo_model) conv var_of_app app_of_var =
+let model_to_mc (m : SAT.pseudo_model) conv cnf =
   (* First, invert the conv array: maps a SAT var to a pair (i,j) (atom i=j) *)
   let nb_var_sat = conv.free_var in
   let nb_var_mc  = Array.length conv.array in
@@ -161,7 +162,7 @@ let model_to_mc (m : SAT.pseudo_model) conv var_of_app app_of_var =
     done;
     match conv.array.(i).(i) with
     | None -> ()
-    | Some v -> inv_array.(v) <- (IMC.App (of_some app_of_var.(i)), i)
+    | Some v -> inv_array.(v) <- (IMC.App (of_some cnf.app_of_var.(i)), i)
   done;
 
   let eqs = ref [] in
@@ -172,7 +173,9 @@ let model_to_mc (m : SAT.pseudo_model) conv var_of_app app_of_var =
     | (Some false, (i, j)) -> neqs := (i, j) :: !neqs
     | (None, _) -> () (* Ignoring unaffected variables *)
   done;
-  IMC.{ nb_var = nb_var_mc; eqs = !eqs; neqs = !neqs; var_of_app }
+  IMC.{ nb_var = nb_var_mc; nb_real_var = cnf.nb_real_var;
+        eqs = !eqs; neqs = !neqs;
+        var_of_app = cnf.var_of_app }
 
 
 
@@ -193,7 +196,7 @@ let satisfiable cnf =
   let conv = ref conv in
   let cnf = ref cnf in
   let check pseudo_model =
-    let m_mc = model_to_mc pseudo_model !conv !cnf.var_of_app !cnf.app_of_var in
+    let m_mc = model_to_mc pseudo_model !conv !cnf in
     (* print_stdout "Calling Model Checker on %a\n" IMC.print_model m_mc; *)
     match IMC.check m_mc with
     | None ->

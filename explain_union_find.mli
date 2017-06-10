@@ -18,3 +18,6 @@ val nearest_common_ancestor : t -> int -> int -> int
     This function raise Not_found if i!~j in t.
 *)
 val explain : t -> int -> int -> (int * int) list
+
+
+val print_classes : Format.formatter -> t -> unit
