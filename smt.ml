@@ -188,7 +188,7 @@ let neg_atom (a : atom) =
 
 
 let satisfiable cnf =
-  (*print_stdout "CNF: %a\n" print_cnf cnf;*)
+  print_stdout "CNF: %a\n" print_cnf cnf;
   let (sat_cnf, conv) = cnf_to_sat cnf in
   let conv = ref conv in
   let cnf = ref cnf in
@@ -209,7 +209,7 @@ let satisfiable cnf =
       sat_cnf.SAT.f
   in
   print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf;
-  match SAT.solve sat_cnf with
+  match SAT.solve sat_cnf check with
   | None -> print_stdout "Unsatisfiable SAT formula\n"; false
   | Some m -> print_stdout "SAT found model %a\n" SAT.print_model m;
     assert (SAT.test_model sat_cnf m);
