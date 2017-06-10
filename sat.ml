@@ -227,7 +227,7 @@ let dpll (m : guess_model) (f : formula) check count nb_var =
    * VSIDS decision heuristic
   *)
 
-  let counter = ref 0 in
+  let counter = ref 1 in
 
   let set_count f =
     let rec set_count_aux = function
@@ -268,10 +268,13 @@ let dpll (m : guess_model) (f : formula) check count nb_var =
     let (m,f) = unit_deal m f in
     let (f, stop) = success_fail m f in
     if stop then k (None, []) else
-      let f = if f = []
-        then let g = check (to_pseudo_model m) in set_count g; g
-        else f in
-      match f with
+      let (f,back) = if f = []
+        then let g = check (to_pseudo_model m) in
+          if g = [] then (g, false)
+          else (set_count g; (g, true))
+        else (f, false) in
+      if back then k (None, f) else
+        match f with
       | [] -> k (Some m, []) (* A valid model was found! *)
       | _  -> let (l,f') = (max_array m, f) in
                 (* if Random.bool () (* Two heuristics are used *)
