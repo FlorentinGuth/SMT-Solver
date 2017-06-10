@@ -188,7 +188,7 @@ let neg_atom (a : atom) =
 
 
 let satisfiable cnf =
-  print_stdout "CNF: %a\n" print_cnf cnf;
+  (* print_stdout "CNF: %a\n" print_cnf cnf; *)
   let (sat_cnf, conv) = cnf_to_sat cnf in
   let conv = ref conv in
   let cnf = ref cnf in
@@ -197,7 +197,7 @@ let satisfiable cnf =
     (* print_stdout "Calling Model Checker on %a\n" IMC.print_model m_mc; *)
     match IMC.check m_mc with
     | None ->
-      print_stdout "Model Checker validated the model\n";
+      (* print_stdout "Model Checker validated the model\n"; *)
       []
 
     | Some l ->
@@ -218,9 +218,9 @@ let satisfiable cnf =
        | FTrue | FFalse -> conv := create_conv val_cnf.nb_var);
       sat_cnf.SAT.f
   in
-  print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf;
+  (* print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf; *)
   match SAT.solve sat_cnf check with
-  | None -> print_stdout "Unsatisfiable SAT formula\n"; false
-  | Some m -> print_stdout "SAT found model %a\n" SAT.print_model m;
+  | None -> (* print_stdout "Unsatisfiable SAT formula\n"; *) false
+  | Some m -> (* print_stdout "SAT found model %a\n" SAT.print_model m; *)
     assert (SAT.test_model sat_cnf m);
     true
