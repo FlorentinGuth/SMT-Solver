@@ -130,6 +130,7 @@ and explain_aux t a b acc =
 and explain t a b =
   let res = explain_aux t a b [] in
   PUF.reset t.puf;
+  (* TODO: Elimination of redundant clauses *)
   res
 
 

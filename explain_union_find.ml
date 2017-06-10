@@ -92,7 +92,6 @@ type t = {
   parent  : int array;
   proof   : int array;  (* The proof forest *)
   rank    : int array;
-  hi_node : int array;  (* Parent in the proof forest *)
 }
 
 
@@ -100,7 +99,6 @@ let create n =
   {
     parent  = Array.init n (fun i -> i);
     proof   = Array.init n (fun i -> i);
-    hi_node = Array.init n (fun i -> i);
     rank    = Array.init n (fun _ -> 0);
   }
 
@@ -136,7 +134,6 @@ let union t i j =
     reverse j j;
     (* Finally performs the merge, j is now the representative of its class *)
     t.proof.(j) <- i;
-    t.hi_node.(pi) <- j
   in
   let pi = find t i in
   let pj = find t j in
@@ -207,6 +204,6 @@ let test () =
   let v = [0;1;2;3] in
   List.iter explain (zip v v);
   let print_array a = Array.iteri (fun i x -> Printf.printf "%d:%d " i x) a; Printf.printf"\n" in
-  print_array t.parent; print_array t.proof; (*print_array t.hi_node;*)
+  print_array t.parent; print_array t.proof;
   Printf.printf "%d\n" (nearest_common_ancestor t 2 3)
 (* let () = test () *)
