@@ -148,6 +148,20 @@ compression de chemin, et en réalisant des fusions qui correspondent réellemen
 
 \subsection {Solveur \foreign{SAT}}
 
+Le solveur \foreign{SAT} fonctionne en suivant les règles \foreign{DPLL(T)} avec quelques améliorations.
+
+À chaque itération de la boucle principale du solveur, la règle \foreign{Unit} est appliquée autant que possible, puis le solveur vérifie si le modèle ainsi obtenu valide ou invalide la formule. Si un des deux cas est avéré, alors il s'arrête. Sinon, il choisit un littéral, selon l'heuristique VSIDS propoée par \cite{Chaff}, dont il devine la valeur, et il s'appelle récursivement.
+
+L'interface proposée pour la formule et son modèle est persistante, ce qui permet de backtracker facilement en cas d'échec. Cela permet aussi d'effacer de la formule les clauses qui sont validées au fur et à mesure par le modèle. Ainsi, une clause déjà validée n'est pas explorée plusieurs fois ; elle réapparaît cependant par persistance après backtracking.
+
+Le solveur \foreign{SAT} est entièrement incrémental : dès qu'il trouve un modèle valide, il demande au \foreign{Model Checker} une validation. Si celui-ci la lui donne, alors le problème est terminé ; sinon, il backtrack en ajoutant à sa formule l'indication du \foreign{Model Checker}, et en mettant à jour le compteur des littéraux de l'heuristique \foreign{VSIDS}.\\
+
+Deux autres heuristiques ont été programmées (mais non raccordées au programme) : \begin{itemize}
+	\item Celle notée \foreign{RAND} dans \cite{Chaff}, consistant à prendre une littéral au hasard
+	\item Une autre consistant à prendre le premier littéral non assigné de la clause suivante (avec sa valeur de vérité de façon à valider cette clause)
+\end{itemize}
+
+Par ailleurs, nous avons tenté de supprimer au fur et à mesure les littéraux non validés dans les clauses, de façon à ne se préoccuper que de ceux non assignés et donc de réduire le temps d'analyse de chaque clause. Cependant, le surcoût nécessaire à la réécriture de chaque clause dépassait systématiquement le gain en temps d'analyse. Il aurait pu être plus efficace d'effectuer cette opération de nettoyage des clauses une fois de temps en temps, comme une heuristique supplémentaire, mais cela ne s'est pas vérifié dans nos tests.
 
 \section{Améliorations}
 
@@ -167,14 +181,9 @@ les configurations et produise des tests plus difficiles (i.e. des formules
 vraies pour peu d'assignements).
 
 Nous n'avons pas essayé d'implémenter un solveur \foreign{SAT} \foreign{CDCL} 
-afin de comparer son efficacité au solveur \foreign{DPLL}.
+afin de comparer son efficacité au solveur \foreign{DPLL}. La méthode du \foreign{two-watched literal} n'a pas non plus été implémentée, car elle se prête assez mal à la structure de liste chaînée utilisée pour représenter les clauses.
 
-Il suffirait d'une petite modification de l'algorithme pour qu'il renvoie les 
-classes d'équivalences des différentes variables une fois un assignement trouvé 
-(bien qu'il faudrait faire la conversion du \foreign{parsing} dans l'autre 
-sens). On pourrait aussi imaginer que dans le cas ou la formule n'est pas 
-satisfiable, le solveur produit une preuve de ceci, vérifiable par un programme 
-externe comme \foreign{Coq}.
+Enfin, on pourrait imaginer que dans le cas ou la formule n'est pas satisfiable, le solveur produise une preuve de ceci, vérifiable par un programme externe comme \foreign{Coq}.
 
 
 \bibliographystyle{plain}

@@ -27,4 +27,4 @@ val print_pseudo_model : Format.formatter -> pseudo_model -> unit
 val test_model    : cnf -> model -> bool
 
 (** This function solves the given CNF, returning a model if satisfiable or None otherwise *)
-val solve : cnf -> (pseudo_model -> formula) -> model option
+val solve : cnf -> (pseudo_model -> clause) -> model option

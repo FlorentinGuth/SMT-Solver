@@ -234,14 +234,15 @@ let dpll (m : guess_model) (f : formula) check count nb_var =
 
   let counter = ref 1 in
 
-  let set_count f =
-    let rec set_count_aux = function
-      | [] -> ()
-      | (n,v)::l -> let (pos,neg) = count.(v) in
-        count.(v) <- (if n = Neg then (pos,neg+1) else (pos+1,neg));
-        set_count_aux l in
-    List.iter set_count_aux f in
-  set_count f;
+  let rec set_count = function
+    | [] -> ()
+    | (n,v)::l -> let (pos,neg) = count.(v) in
+      count.(v) <- (if n = Neg then (pos,neg+1) else (pos+1,neg));
+      set_count l in
+
+  let set_count_formula f =
+    List.iter set_count f in
+  set_count_formula f;
 
   let divide_count m =
     Array.iteri (fun i (p,n) -> count.(i) <- (p/m, n/m)) count in
@@ -274,9 +275,9 @@ let dpll (m : guess_model) (f : formula) check count nb_var =
     if stop then k (None, []) else
       let (f,back) = begin
         if f = []
-        then let g = check (to_pseudo_model m) in
-          (if g = [] then (g, false)
-           else (set_count g; (g, true)))
+        then (match check (to_pseudo_model m) with
+            | [] -> (f, false)
+            | c  -> set_count c; ([c], true))
         else (f, false) end in
       if back then k (None, f) else
         match f with
