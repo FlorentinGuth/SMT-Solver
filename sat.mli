@@ -21,7 +21,8 @@ val print_clause  : Format.formatter -> clause  -> unit
 val print_formula : Format.formatter -> formula -> unit
 val print_cnf     : Format.formatter -> cnf     -> unit
 
-val print_model   : Format.formatter -> model   -> unit
+val print_model        : Format.formatter -> model        -> unit
+val print_pseudo_model : Format.formatter -> pseudo_model -> unit
 
 val test_model    : cnf -> model -> bool
 

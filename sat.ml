@@ -33,21 +33,26 @@ type pseudo_model = (bool option) array
 type model = bool array
 
 let print_var fmt var =
-  fprintf fmt "%d" var
+  fprintf fmt "%d" (var+1)
 let print_neg fmt neg =
   fprintf fmt "%s" (match neg with Neg -> "!" | NoNeg -> "")
 let print_atom fmt (n,v) =
   fprintf fmt "%a%a" print_neg n print_var v
 let print_clause fmt clause =
-  print_list print_atom "\\/" fmt clause
+  print_list print_atom Printer.or_str fmt clause
 let print_formula fmt f =
-  print_list print_clause " /\\ " fmt f
+  print_list print_clause (" " ^ Printer.and_str ^ " ") fmt f
 let print_cnf fmt cnf =
   print_formula fmt cnf.f
 
+let print_bool fmt b =
+  fprintf fmt "%s" (if b then "T" else "F")
 let print_model fmt m =
-  print_list (fun fmt b -> fprintf fmt "%s" (if b then "T" else "F")) ";"
-    fmt (Array.to_list m)
+  Array.iteri (fun i b -> fprintf fmt "%a:%a " print_var i print_bool b) m
+let print_bool_option fmt b =
+  fprintf fmt "%s" (match b with None -> "?" | Some true -> "T" | Some false -> "F")
+let print_pseudo_model fmt m =
+  Array.iteri (fun i b -> fprintf fmt "%a:%a " print_var i print_bool_option b) m
 
 let print_guess_model fmt m =
   print_list (fun fmt l

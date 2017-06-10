@@ -47,3 +47,6 @@ type model = {
     Returns None if the model is satisfiable, and an explanation otherwise.
 *)
 val check : model -> (Mc.rel * eq) list option
+
+
+val print_model : Format.formatter -> model -> unit

@@ -27,22 +27,25 @@ type cnf = {
 
 
 let print_cnf fmt cnf =
-  let rec print_literal fmt lit =
+  let print_var fmt v =
+    fprintf fmt "%d" (v+1)
+  in
+  let print_literal fmt lit =
     match lit with
-    | IMC.Var v -> fprintf fmt "%d" v
-    | IMC.App (f,x) -> fprintf fmt "%d(%d)" f x
+    | IMC.Var v -> print_var fmt v
+    | IMC.App (f,x) -> fprintf fmt "%a(%a)" print_var f print_var x
   in
   let print_rel fmt rel =
     fprintf fmt "%s" (match rel with MC.Eq -> eq_str | MC.Neq -> neq_str)
   in
   let print_atom fmt (rel,(l,v)) =
-    fprintf fmt "%a%a%d" print_literal l print_rel rel v
+    fprintf fmt "%a%a%a" print_literal l print_rel rel print_var v
   in
   let print_clause fmt cl =
     print_list print_atom or_str fmt cl
   in
   let print_formula fmt f =
-    print_list print_clause and_str fmt f
+    print_list print_clause (" " ^ and_str ^ " ") fmt f
   in
   print_formula fmt cnf.f
 
@@ -155,7 +158,8 @@ let model_to_mc (m : SAT.pseudo_model) conv cnf =
   let nb_var_mc  = Array.length conv.array in
   let inv_array = Array.make nb_var_sat (IMC.Var 0, 0) in
   for i = 0 to nb_var_mc - 1 do
-    for j = 0 to i - 1 do
+    for
+j = 0 to i - 1 do
       match conv.array.(i).(j) with
       | None -> ()
       | Some v -> inv_array.(v) <- (IMC.Var i, j)
@@ -191,16 +195,17 @@ let neg_atom (a : atom) =
 
 
 let satisfiable cnf =
-  (* print_stdout "CNF: %a\n" print_cnf cnf; *)
+  print_stdout "CNF: %a\n" print_cnf cnf;
   let (sat_cnf, conv) = cnf_to_sat cnf in
   let conv = ref conv in
   let cnf = ref cnf in
   let check pseudo_model =
+    print_stdout "SAT solver found model %a\n" SAT.print_pseudo_model pseudo_model;
     let m_mc = model_to_mc pseudo_model !conv !cnf in
-    (* print_stdout "Calling Model Checker on %a\n" IMC.print_model m_mc; *)
+    print_stdout "Calling Model Checker on %a\n" IMC.print_model m_mc;
     match IMC.check m_mc with
     | None ->
-      (* print_stdout "Model Checker validated the model\n"; *)
+      print_stdout "Model Checker validated the model\n";
       []
 
     | Some l ->
@@ -219,11 +224,12 @@ let satisfiable cnf =
       (match formula_to_sat !conv val_cnf.var_of_app !cnf.f with
        | Formula _      -> ()
        | FTrue | FFalse -> conv := create_conv val_cnf.nb_var);
+      print_stdout "Adding SAT clause %a\n" SAT.print_cnf sat_cnf;
       sat_cnf.SAT.f
   in
-  (* print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf; *)
+  print_stdout "Calling SAT solver on %a\n" SAT.print_cnf sat_cnf;
   match SAT.solve sat_cnf check with
-  | None -> (* print_stdout "Unsatisfiable SAT formula\n"; *) false
-  | Some m -> (* print_stdout "SAT found model %a\n" SAT.print_model m; *)
+  | None -> print_stdout "Unsatisfiable SAT formula\n"; false
+  | Some m -> print_stdout "SAT found model %a\n" SAT.print_model m;
     assert (SAT.test_model sat_cnf m);
     true

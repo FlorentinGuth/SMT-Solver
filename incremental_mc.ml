@@ -168,7 +168,7 @@ let check m =
   List.iter (merge t) m.eqs;
   let rec check_neqs = function
     | [] ->
-      Printer.print_stdout "Model valid: %a\n@." EUF.print_classes t.euf;
+      Printer.print_stdout "Model valid: %a\n" EUF.print_classes t.euf;
       None
 
     | neq :: neqs ->
@@ -182,3 +182,16 @@ let check m =
         check_neqs neqs
   in
   check_neqs m.neqs
+
+
+let print_var fmt v =
+  Format.fprintf fmt "%d" (v+1)
+let print_lit fmt = function
+  | Var v     -> print_var fmt v
+  | App (f,x) -> Format.fprintf fmt "%a(%a)" print_var f print_var x
+let print_eq eq fmt (l,v) =
+  Format.fprintf fmt "%a%s%a" print_lit l (if eq then Printer.eq_str else Printer.neq_str) print_var v
+let print_eqs eq fmt eqs =
+  Printer.print_list (print_eq eq) (" " ^ Printer.and_str ^ " ") fmt eqs
+let print_model fmt m =
+  print_eqs true fmt m.eqs; Format.fprintf fmt " %s " Printer.and_str; print_eqs false fmt m.neqs
